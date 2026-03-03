@@ -4,6 +4,7 @@ import { detectState } from '@/lib/extraction/StateDetector'
 import { createSmartChunks } from '@/lib/extraction/SmartChunker'
 import { extractAllChunks } from '@/lib/extraction/GeminiExtractor'
 import { deduplicateWithinUpload } from '@/lib/extraction/Deduplicator'
+import { QuotaManager } from '@/lib/quota/QuotaManager'
 import pdfParse from 'pdf-parse'
 import formidable from 'formidable'
 import fs from 'fs'
@@ -15,8 +16,32 @@ export const config = {
 
 async function POST(req: Request) {
   const supabase = createClient()
+  const quotaMgr = new QuotaManager(supabase)
 
   try {
+    // ✅ CHECK QUOTA BEFORE PROCESSING
+    const quotaStatus = await quotaMgr.checkQuotaAvailable()
+    if (!quotaStatus.available) {
+      return Response.json(
+        {
+          error: 'API quota exhausted (20 requests/day)',
+          quota_reset_at: quotaStatus.reset_at,
+        },
+        { status: 429 }
+      )
+    }
+
+    // ✅ SELECT BEST AVAILABLE API KEY
+    const selectedKey = await quotaMgr.selectNextApiKey()
+    if (!selectedKey) {
+      return Response.json(
+        { error: 'No API keys available for extraction' },
+        { status: 503 }
+      )
+    }
+
+    console.log(`[QUOTA] Using API key: ${selectedKey.nickname} (${selectedKey.quota_remaining} remaining)`)
+
     // Parse form data
     const form = formidable({ maxFileSize: 50 * 1024 * 1024 })
     const [fields, files] = await form.parse(req as any)
@@ -83,7 +108,10 @@ async function POST(req: Request) {
 
     // Process extraction asynchronously
     setImmediate(() => {
-      runExtraction(uploadId, slug, stateCodeInput, file.filepath, supabase)
+      runExtraction(uploadId, slug, stateCode, file.filepath, supabase, {
+        apiKeyId: selectedKey.id,
+        schoolName: schoolName,
+      })
         .catch(err => {
           console.error('Async extraction error:', err)
           updateUploadError(uploadId, err.message, supabase).catch(e =>
@@ -107,7 +135,8 @@ async function runExtraction(
   schoolSlug: string,
   stateCode: StateCode,
   filePath: string,
-  supabase: any
+  supabase: any,
+  options?: { apiKeyId?: string; schoolName?: string }
 ) {
   const start = Date.now()
 
@@ -129,7 +158,11 @@ async function runExtraction(
     await supabase.from('uploads').update({ total_chunks: chunks.length }).eq('id', uploadId)
 
     console.log(`[${uploadId}] Extracting with Gemini...`)
-    const chunkResults = await extractAllChunks(chunks, finalState)
+    const chunkResults = await extractAllChunks(chunks, finalState, {
+      apiKeyId: options?.apiKeyId,
+      uploadId: uploadId,
+      schoolName: options?.schoolName,
+    })
 
     const allCourses = chunkResults.flatMap(r => r.courses)
     console.log(`[${uploadId}] ${allCourses.length} courses extracted`)
