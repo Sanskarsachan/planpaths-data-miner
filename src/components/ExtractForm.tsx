@@ -24,16 +24,23 @@ interface ExtractionResult {
   error_message?: string
 }
 
+interface PageRange {
+  start: number | null
+  end: number | null
+}
+
 export function ExtractForm() {
   const [schoolName, setSchoolName] = useState('')
   const [state, setState] = useState('Florida')
   const [file, setFile] = useState<File | null>(null)
+  const [pdfPageCount, setPdfPageCount] = useState<number | null>(null)
+  const [pageRange, setPageRange] = useState<PageRange>({ start: null, end: null })
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<ExtractionResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [statusChecking, setStatusChecking] = useState(false)
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
     if (selectedFile) {
       if (selectedFile.size > 50 * 1024 * 1024) {
@@ -44,6 +51,25 @@ export function ExtractForm() {
         setError('File must be a PDF')
         return
       }
+      
+      // Try to detect page count by reading PDF header
+      try {
+        const buffer = await selectedFile.slice(0, 8192).arrayBuffer()
+        const view = new Uint8Array(buffer)
+        const text = new TextDecoder().decode(view)
+        
+        // Look for /Type /Pages pattern to estimate page count
+        const match = text.match(/\/Count\s+(\d+)/i)
+        if (match && match[1]) {
+          const pageCount = parseInt(match[1])
+          setPdfPageCount(pageCount)
+          setPageRange({ start: 1, end: pageCount })
+        }
+      } catch (err) {
+        console.log('Could not detect page count')
+        setPageRange({ start: null, end: null })
+      }
+      
       setFile(selectedFile)
       setError(null)
     }
@@ -95,6 +121,12 @@ export function ExtractForm() {
       return
     }
 
+    // Validate page range if specified
+    if (pageRange.start && pageRange.end && pageRange.start > pageRange.end) {
+      setError('Start page must be less than or equal to end page')
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -102,6 +134,12 @@ export function ExtractForm() {
       formData.append('school_name', schoolName)
       formData.append('state', state)
       formData.append('file', file)
+      
+      // Add page range if specified
+      if (pageRange.start && pageRange.end) {
+        formData.append('page_start', pageRange.start.toString())
+        formData.append('page_end', pageRange.end.toString())
+      }
 
       const response = await fetch('/api/extract', {
         method: 'POST',
@@ -193,6 +231,7 @@ export function ExtractForm() {
                           <span className="font-medium">{file.name}</span>
                           <br />
                           ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                          {pdfPageCount && <><br /><span className="text-gray-500">{pdfPageCount} pages</span></>}
                         </>
                       ) : (
                         <>
@@ -206,6 +245,61 @@ export function ExtractForm() {
                 </label>
               </div>
             </div>
+
+            {/* Page Range Selection (Optional) */}
+            {pdfPageCount && pdfPageCount > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Page Range (Optional - leave blank to process entire document)
+                </label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-600 mb-1 block">Start Page</label>
+                    <select
+                      value={pageRange.start || ''}
+                      onChange={e => setPageRange({ 
+                        ...pageRange, 
+                        start: e.target.value ? parseInt(e.target.value) : null 
+                      })}
+                      disabled={loading}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    >
+                      <option value="">Full document</option>
+                      {Array.from({ length: Math.ceil(pdfPageCount / 5) }, (_, i) => {
+                        const start = i * 5 + 1
+                        const end = Math.min((i + 1) * 5, pdfPageCount)
+                        return (
+                          <option key={start} value={start}>
+                            Pages {start}-{end}
+                          </option>
+                        )
+                      })}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600 mb-1 block">End Page</label>
+                    <input
+                      type="number"
+                      min={pageRange.start || 1}
+                      max={pdfPageCount}
+                      value={pageRange.end || ''}
+                      onChange={e => setPageRange({ 
+                        ...pageRange, 
+                        end: e.target.value ? parseInt(e.target.value) : null 
+                      })}
+                      placeholder={pdfPageCount.toString()}
+                      disabled={loading}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    />
+                  </div>
+                </div>
+                {pageRange.start && pageRange.end && (
+                  <p className="mt-2 text-xs text-blue-700">
+                    📄 Will extract pages {pageRange.start}-{pageRange.end} of {pdfPageCount}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Error */}
             {error && (

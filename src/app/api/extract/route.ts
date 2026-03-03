@@ -19,28 +19,17 @@ async function POST(req: Request) {
   const quotaMgr = new QuotaManager(supabase)
 
   try {
-    // ✅ CHECK QUOTA BEFORE PROCESSING
-    const quotaStatus = await quotaMgr.checkQuotaAvailable()
-    if (!quotaStatus.available) {
-      return Response.json(
-        {
-          error: 'API quota exhausted (20 requests/day)',
-          quota_reset_at: quotaStatus.reset_at,
-        },
-        { status: 429 }
-      )
-    }
-
-    // ✅ SELECT BEST AVAILABLE API KEY
+    // ✅ SELECT BEST AVAILABLE API KEY (falls back to env var if needed)
+    // Note: Quota checking happens automatically and fails open
     const selectedKey = await quotaMgr.selectNextApiKey()
-    if (!selectedKey) {
+    if (!selectedKey || !selectedKey.key) {
       return Response.json(
-        { error: 'No API keys available for extraction' },
+        { error: 'No API keys available. Please check configuration.' },
         { status: 503 }
       )
     }
 
-    console.log(`[QUOTA] Using API key: ${selectedKey.nickname} (${selectedKey.quota_remaining} remaining)`)
+    console.log(`[EXTRACT] Using API key: ${selectedKey.nickname} (${selectedKey.quota_remaining} remaining)`)
 
     // Parse form data
     const form = formidable({ maxFileSize: 50 * 1024 * 1024 })
@@ -48,6 +37,8 @@ async function POST(req: Request) {
 
     const schoolName = fields.school_name?.[0]
     const stateCodeInput = fields.state_code?.[0] as StateCode | undefined
+    const pageStart = fields.page_start?.[0] ? parseInt(fields.page_start[0]) : undefined
+    const pageEnd = fields.page_end?.[0] ? parseInt(fields.page_end[0]) : undefined
     const file = Array.isArray(files.file) ? files.file[0] : files.file
 
     if (!schoolName || !stateCodeInput || !file) {
@@ -108,9 +99,11 @@ async function POST(req: Request) {
 
     // Process extraction asynchronously
     setImmediate(() => {
-      runExtraction(uploadId, slug, stateCode, file.filepath, supabase, {
+      runExtraction(uploadId, slug, stateCodeInput as StateCode, file.filepath, supabase, {
         apiKeyId: selectedKey.id,
         schoolName: schoolName,
+        pageStart: pageStart,
+        pageEnd: pageEnd,
       })
         .catch(err => {
           console.error('Async extraction error:', err)
@@ -136,14 +129,34 @@ async function runExtraction(
   stateCode: StateCode,
   filePath: string,
   supabase: any,
-  options?: { apiKeyId?: string; schoolName?: string }
+  options?: { 
+    apiKeyId?: string
+    schoolName?: string
+    pageStart?: number
+    pageEnd?: number
+  }
 ) {
   const start = Date.now()
 
   try {
     const buffer = fs.readFileSync(filePath)
     const pdfData = await pdfParse(buffer)
-    const text = pdfData.text
+    let text = pdfData.text
+
+    // Filter pages if range specified
+    if (options?.pageStart && options?.pageEnd) {
+      const pageStart = Math.max(1, options.pageStart)
+      const pageEnd = Math.min(pdfData.numpages, options.pageEnd)
+      console.log(`[${uploadId}] Extracting pages ${pageStart}-${pageEnd} of ${pdfData.numpages}`)
+      
+      // For simplicity, we'll extract pages by reconstructing text (basic approach)
+      // In production, use a PDF library that supports page extraction
+      const lines = text.split('\n')
+      const estimatedLinesPerPage = Math.ceil(lines.length / pdfData.numpages)
+      const startLine = (pageStart - 1) * estimatedLinesPerPage
+      const endLine = pageEnd * estimatedLinesPerPage
+      text = lines.slice(startLine, endLine).join('\n')
+    }
 
     const detected = detectState(text, filePath)
     const finalState = detected !== 'UNKNOWN' ? detected : stateCode
