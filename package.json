@@ -10,6 +10,9 @@
     "start": "next start",
     "lint": "next lint --no-cache",
     "type-check": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "db:push": "supabase db push",
     "db:pull": "supabase db pull",
     "import-master-db": "tsx scripts/import-master-db.ts"
@@ -38,7 +41,10 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/formidable": "^3.4.5",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.10.6",
     "@types/papaparse": "^5.3.14",
     "@types/pdf-parse": "^1.1.4",
@@ -47,9 +53,13 @@
     "autoprefixer": "^10.4.17",
     "eslint": "^8.56.0",
     "eslint-config-next": "^15.1.0",
+    "jest": "^30.2.0",
+    "jest-environment-jsdom": "^30.2.0",
     "postcss": "^8.4.33",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5.3.3",
-    "tsx": "^4.7.0"
+    "ts-jest": "^29.4.6",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
   }
 }
