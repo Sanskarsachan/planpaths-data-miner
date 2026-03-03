@@ -1,4 +1,8 @@
-export async function GET(req: Request, { params }: { params: { uploadId: string } }) {
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ uploadId: string }> }
+) {
+  await params
   return Response.json(
     { error: 'Not yet implemented' },
     { status: 501 }

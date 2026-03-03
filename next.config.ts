@@ -5,9 +5,7 @@ const nextConfig: NextConfig = {
   typescript: {
     tsconfigPath: "./tsconfig.json"
   },
-  experimental: {
-    serverComponentsExternalPackages: ["pdf-parse"]
-  },
+  serverExternalPackages: ["pdf-parse"],
   webpack: (config, { isServer }) => {
     if (isServer) {
       config.externals.push("pdf-parse");
