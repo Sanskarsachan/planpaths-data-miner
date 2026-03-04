@@ -13,15 +13,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-background text-foreground">
+      <body className="bg-background text-foreground m-0">
         <div className="min-h-screen flex flex-col">
-          <header className="border-b bg-white">
-            <div className="container mx-auto px-4 py-4">
-              <h1 className="text-2xl font-bold">PlanPaths Data Miner</h1>
-              <p className="text-sm text-gray-600">Extract school course catalogs → Supabase → Master DB Mapping</p>
-            </div>
-          </header>
-          <main className="flex-1 container mx-auto px-4 py-8">
+          <main className="flex-1">
             {children}
           </main>
           <footer className="border-t bg-gray-50 py-4 mt-8">
