@@ -44,3 +44,4 @@ lerna-debug.log*
 *.tmp
 *.temp
 .cache/
+*.tsbuildinfo
