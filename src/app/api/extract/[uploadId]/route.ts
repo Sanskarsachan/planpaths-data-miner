@@ -1,10 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
+import { getJob } from '@/lib/extraction/JobStore'
 
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ uploadId: string }> }
 ) {
   const { uploadId } = await params
+  const inMemory = getJob(uploadId)
+  if (inMemory) {
+    return Response.json(inMemory)
+  }
+
   const supabase = createClient()
 
   try {
@@ -15,17 +21,31 @@ export async function GET(
       .single()
 
     if (error || !data) {
-      return Response.json(
-        { error: 'Upload not found' },
-        { status: 404 }
-      )
+      return Response.json({
+        id: uploadId,
+        status: 'processing',
+        courses_found: 0,
+        dupes_removed: 0,
+        total_chunks: 0,
+        processing_ms: null,
+        error_message: null,
+        courses: [],
+        temporary: true,
+      })
     }
 
     return Response.json(data)
   } catch (err: any) {
-    return Response.json(
-      { error: err.message },
-      { status: 500 }
-    )
+    return Response.json({
+      id: uploadId,
+      status: 'processing',
+      courses_found: 0,
+      dupes_removed: 0,
+      total_chunks: 0,
+      processing_ms: null,
+      error_message: null,
+      courses: [],
+      temporary: true,
+    })
   }
 }

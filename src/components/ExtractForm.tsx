@@ -1,453 +1,370 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
-import { Upload, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-const US_STATES = [
-  'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut',
-  'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa',
-  'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan',
-  'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire',
-  'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio',
-  'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota',
-  'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia',
-  'Wisconsin', 'Wyoming'
-]
+type Status = 'idle' | 'extracting' | 'done' | 'failed'
 
-interface ExtractionResult {
-  upload_id: string
-  school_slug: string
-  status: 'processing' | 'complete' | 'failed'
-  courses_found?: number
-  dupes_removed?: number
-  processing_ms?: number
-  error_message?: string
+type Course = {
+  id: number
+  name: string
+  code: string
+  category: string
+  grade: string
+  credit: string
+  length: 'Y' | 'S'
 }
 
-interface PageRange {
-  start: number | null
-  end: number | null
+type ApiKey = {
+  id: string
+  nickname: string
+  quota_remaining: number
+  quota_limit: number
+  is_active: boolean
+}
+
+type JobResponse = {
+  id: string
+  status: 'processing' | 'complete' | 'failed'
+  courses_found: number
+  dupes_removed: number
+  total_chunks: number
+  processing_ms: number | null
+  error_message: string | null
+  courses?: Course[]
+}
+
+type RangeOption = { label: string; start: number; end: number }
+
+const COLORS: Record<string, string> = {
+  'Visual Arts': '#7c3aed',
+  'Performing Arts': '#db2777',
+  Mathematics: '#0891b2',
+  'Language Arts': '#059669',
+  Science: '#d97706',
+  'Social Studies': '#dc2626',
+  General: '#6b7280',
+}
+
+const STATE_OPTIONS = ['Florida', 'Texas', 'California']
+
+function detectPdfPageCount(text: string): number {
+  const matches = [...text.matchAll(/\/Count\s+(\d+)/g)]
+  const values = matches.map(m => parseInt(m[1], 10)).filter(n => Number.isFinite(n) && n > 0 && n < 100000)
+  if (values.length > 0) return Math.max(...values)
+  const pageMatches = text.match(/\/Type\s*\/Page(?!s)/g)
+  if (pageMatches?.length) return pageMatches.length
+  return 1
+}
+
+function buildRanges(totalPages: number): RangeOption[] {
+  const ranges: RangeOption[] = []
+  for (let page = 1; page <= totalPages; page += 5) {
+    const start = page
+    const end = Math.min(page + 4, totalPages)
+    ranges.push({ start, end, label: `Pages ${start}–${end}` })
+  }
+  return ranges
+}
+
+function relTime(ts: number): string {
+  const d = Math.floor((Date.now() - ts) / 1000)
+  if (d < 60) return 'just now'
+  if (d < 3600) return `${Math.floor(d / 60)}m ago`
+  if (d < 86400) return `${Math.floor(d / 3600)}h ago`
+  return `${Math.floor(d / 86400)}d ago`
 }
 
 export function ExtractForm() {
+  const [status, setStatus] = useState<Status>('idle')
+  const [elapsed, setElapsed] = useState(0)
   const [schoolName, setSchoolName] = useState('')
   const [state, setState] = useState('Florida')
   const [file, setFile] = useState<File | null>(null)
-  const [pdfPageCount, setPdfPageCount] = useState<number | null>(null)
-  const [pageRange, setPageRange] = useState<PageRange>({ start: null, end: null })
-  const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<ExtractionResult | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [statusChecking, setStatusChecking] = useState(false)
+  const [fileName, setFileName] = useState('Drop PDF here')
+  const [isDragging, setIsDragging] = useState(false)
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0]
-    if (selectedFile) {
-      if (selectedFile.size > 50 * 1024 * 1024) {
-        setError('File must be smaller than 50MB')
-        return
-      }
-      if (!selectedFile.type.includes('pdf')) {
-        setError('File must be a PDF')
-        return
-      }
-      
-      // Try to detect page count by reading PDF header
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([])
+  const [selectedApiKey, setSelectedApiKey] = useState('auto')
+
+  const [totalPages, setTotalPages] = useState<number>(0)
+  const [selectedRange, setSelectedRange] = useState('all')
+  const [searchQ, setSearchQ] = useState('')
+
+  const [uploadId, setUploadId] = useState<string | null>(null)
+  const [courses, setCourses] = useState<Course[]>([])
+  const [error, setError] = useState<string | null>(null)
+
+  const [recent, setRecent] = useState<Array<{ id: string; name: string; status: 'completed' | 'failed'; courses: number; ts: number }>>([])
+
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  const ranges = useMemo(() => (totalPages > 0 ? buildRanges(totalPages) : []), [totalPages])
+
+  const filteredCourses = useMemo(
+    () =>
+      courses.filter(course =>
+        !searchQ ||
+        course.name.toLowerCase().includes(searchQ.toLowerCase()) ||
+        course.code.toLowerCase().includes(searchQ.toLowerCase()) ||
+        course.category.toLowerCase().includes(searchQ.toLowerCase())
+      ),
+    [courses, searchQ]
+  )
+
+  useEffect(() => {
+    const loadKeys = async () => {
       try {
-        const buffer = await selectedFile.slice(0, 8192).arrayBuffer()
-        const view = new Uint8Array(buffer)
-        const text = new TextDecoder().decode(view)
-        
-        // Look for /Type /Pages pattern to estimate page count
-        const match = text.match(/\/Count\s+(\d+)/i)
-        if (match && match[1]) {
-          const pageCount = parseInt(match[1])
-          setPdfPageCount(pageCount)
-          setPageRange({ start: 1, end: pageCount })
-        }
-      } catch (err) {
-        console.log('Could not detect page count')
-        setPageRange({ start: null, end: null })
+        const res = await fetch('/api/v2/quota/available-keys')
+        const data = await res.json()
+        setApiKeys(Array.isArray(data.keys) ? data.keys : [])
+      } catch {
+        setApiKeys([])
       }
-      
-      setFile(selectedFile)
-      setError(null)
+    }
+    loadKeys()
+  }, [])
+
+  useEffect(() => {
+    if (status === 'extracting') {
+      timerRef.current = setInterval(() => setElapsed(prev => prev + 1), 1000)
+    } else if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  }, [status])
+
+  const pollStatus = useCallback(async (id: string) => {
+    for (let i = 0; i < 180; i++) {
+      let data: JobResponse | null = null
+      try {
+        const res = await fetch(`/api/extract/${id}`)
+        data = await res.json()
+      } catch {
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        continue
+      }
+
+      if (!data) {
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        continue
+      }
+
+      if (data.status === 'complete') {
+        setCourses(Array.isArray(data.courses) ? data.courses : [])
+        setStatus('done')
+        setRecent(prev => [
+          { id, name: fileName, status: 'completed', courses: data.courses_found ?? 0, ts: Date.now() },
+          ...prev.slice(0, 9),
+        ])
+        return
+      }
+
+      if (data.status === 'failed') {
+        setStatus('failed')
+        setError(data.error_message || 'Extraction failed')
+        setRecent(prev => [
+          { id, name: fileName, status: 'failed', courses: 0, ts: Date.now() },
+          ...prev.slice(0, 9),
+        ])
+        return
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 1500))
+    }
+
+    setStatus('failed')
+    setError('Timed out waiting for extraction result')
+  }, [fileName])
+
+  const handleFile = async (incoming: File) => {
+    setFile(incoming)
+    setFileName(incoming.name)
+    setError(null)
+
+    try {
+      const buff = await incoming.arrayBuffer()
+      const text = new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(buff))
+      const pages = detectPdfPageCount(text)
+      setTotalPages(pages)
+      setSelectedRange('all')
+    } catch {
+      setTotalPages(1)
+      setSelectedRange('all')
     }
   }
 
-  const pollStatus = useCallback(async (uploadId: string) => {
-    setStatusChecking(true)
-    let isComplete = false
-    let attempts = 0
-    const maxAttempts = 60 // 2 minutes max
+  const handleExtract = async () => {
+    if (!file) return setError('Please upload a PDF')
+    if (!schoolName.trim()) return setError('Please enter school name')
 
-    while (!isComplete && attempts < maxAttempts) {
-      try {
-        const response = await fetch(`/api/extract/${uploadId}`)
-        const data = await response.json()
-
-        setResult(data)
-
-        if (data.status === 'complete' || data.status === 'failed') {
-          isComplete = true
-        } else {
-          // Wait 2 seconds before next poll
-          await new Promise(resolve => setTimeout(resolve, 2000))
-          attempts++
-        }
-      } catch (err) {
-        console.error('Error polling status:', err)
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        attempts++
-      }
-    }
-
-    setStatusChecking(false)
-    setLoading(false)
-  }, [])
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
+    setStatus('extracting')
+    setElapsed(0)
+    setCourses([])
     setError(null)
-    setResult(null)
 
-    if (!schoolName.trim()) {
-      setError('School name is required')
-      return
+    const formData = new FormData()
+    formData.append('school_name', schoolName.trim())
+    formData.append('state', state)
+    formData.append('file', file)
+
+    if (selectedApiKey !== 'auto') {
+      formData.append('api_key_id', selectedApiKey)
     }
 
-    if (!file) {
-      setError('PDF file is required')
-      return
-    }
-
-    // Validate page range if specified
-    if (pageRange.start && pageRange.end && pageRange.start > pageRange.end) {
-      setError('Start page must be less than or equal to end page')
-      return
-    }
-
-    setLoading(true)
-
-    try {
-      const formData = new FormData()
-      formData.append('school_name', schoolName)
-      formData.append('state', state)
-      formData.append('file', file)
-      
-      // Add page range if specified
-      if (pageRange.start && pageRange.end) {
-        formData.append('page_start', pageRange.start.toString())
-        formData.append('page_end', pageRange.end.toString())
+    if (selectedRange !== 'all') {
+      const [start, end] = selectedRange.split('-').map(v => parseInt(v, 10))
+      if (start && end) {
+        formData.append('page_start', `${start}`)
+        formData.append('page_end', `${end}`)
       }
-
-      const response = await fetch('/api/extract', {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Upload failed')
-      }
-
-      const data = await response.json()
-      setResult({ ...data, status: 'processing' })
-
-      // Start polling
-      await pollStatus(data.upload_id)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error occurred')
-      setLoading(false)
     }
+
+    const res = await fetch('/api/extract', { method: 'POST', body: formData })
+    const payload = await res.json()
+
+    if (!res.ok) {
+      setStatus('failed')
+      setError(payload.error || 'Extraction failed')
+      return
+    }
+
+    setUploadId(payload.upload_id)
+    await pollStatus(payload.upload_id)
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto">
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-2xl font-bold mb-6">Extract Courses from PDF</h2>
+    <div style={{ minHeight: '100vh', background: '#0d0b14', color: '#e2e0ea', fontFamily: "'DM Sans', sans-serif", display: 'flex', flexDirection: 'column' }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+        *{box-sizing:border-box}
+        @media (max-width:1024px){.layout{flex-direction:column;height:auto!important}.left{width:100%!important;border-right:none!important;border-bottom:1px solid rgba(255,255,255,.07)}}
+        @media (max-width:640px){.panel{padding:14px!important}.hide-sm{display:none!important}}
+      `}</style>
 
-        {!result ? (
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* School Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                School Name *
-              </label>
-              <input
-                type="text"
-                value={schoolName}
-                onChange={e => setSchoolName(e.target.value)}
-                placeholder="e.g., Orlando High School"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={loading}
-              />
-            </div>
-
-            {/* State Selection */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                State *
-              </label>
-              <select
-                value={state}
-                onChange={e => setState(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={loading}
-              >
-                {US_STATES.map(s => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* File Upload */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Course Catalog PDF *
-              </label>
-              <div className="relative">
-                <input
-                  type="file"
-                  accept=".pdf"
-                  onChange={handleFileChange}
-                  disabled={loading}
-                  className="sr-only"
-                  id="pdf-upload"
-                />
-                <label
-                  htmlFor="pdf-upload"
-                  className={`flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer transition ${
-                    loading ? 'bg-gray-50' : 'hover:border-blue-500 hover:bg-blue-50'
-                  }`}
-                >
-                  <div className="text-center">
-                    <Upload className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-                    <p className="text-sm text-gray-600">
-                      {file ? (
-                        <>
-                          <span className="font-medium">{file.name}</span>
-                          <br />
-                          ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                          {pdfPageCount && <><br /><span className="text-gray-500">{pdfPageCount} pages</span></>}
-                        </>
-                      ) : (
-                        <>
-                          Click to select or drag and drop
-                          <br />
-                          <span className="text-gray-500">PDF up to 50MB</span>
-                        </>
-                      )}
-                    </p>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            {/* Page Range Selection (Optional) */}
-            {pdfPageCount && pdfPageCount > 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Page Range (Optional - leave blank to process entire document)
-                </label>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs text-gray-600 mb-1 block">Start Page</label>
-                    <select
-                      value={pageRange.start || ''}
-                      onChange={e => setPageRange({ 
-                        ...pageRange, 
-                        start: e.target.value ? parseInt(e.target.value) : null 
-                      })}
-                      disabled={loading}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                    >
-                      <option value="">Full document</option>
-                      {Array.from({ length: Math.ceil(pdfPageCount / 5) }, (_, i) => {
-                        const start = i * 5 + 1
-                        const end = Math.min((i + 1) * 5, pdfPageCount)
-                        return (
-                          <option key={start} value={start}>
-                            Pages {start}-{end}
-                          </option>
-                        )
-                      })}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-600 mb-1 block">End Page</label>
-                    <input
-                      type="number"
-                      min={pageRange.start || 1}
-                      max={pdfPageCount}
-                      value={pageRange.end || ''}
-                      onChange={e => setPageRange({ 
-                        ...pageRange, 
-                        end: e.target.value ? parseInt(e.target.value) : null 
-                      })}
-                      placeholder={pdfPageCount.toString()}
-                      disabled={loading}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                    />
-                  </div>
-                </div>
-                {pageRange.start && pageRange.end && (
-                  <p className="mt-2 text-xs text-blue-700">
-                    📄 Will extract pages {pageRange.start}-{pageRange.end} of {pdfPageCount}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Error */}
-            {error && (
-              <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg">
-                <AlertCircle className="h-5 w-5 text-red-600" />
-                <p className="text-sm text-red-800">{error}</p>
-              </div>
-            )}
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading || !schoolName.trim() || !file}
-              className={`w-full px-6 py-3 font-medium rounded-lg transition flex items-center justify-center gap-2 ${
-                loading || !schoolName.trim() || !file
-                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                  : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  {statusChecking ? 'Extracting...' : 'Uploading...'}
-                </>
-              ) : (
-                'Extract Courses'
-              )}
-            </button>
-          </form>
-        ) : (
-          <div className="space-y-4">
-            {/* Result Status */}
-            <div
-              className={`flex items-center gap-3 p-4 rounded-lg ${
-                result.status === 'complete'
-                  ? 'bg-green-50 border border-green-200'
-                  : result.status === 'failed'
-                    ? 'bg-red-50 border border-red-200'
-                    : 'bg-blue-50 border border-blue-200'
-              }`}
-            >
-              {result.status === 'processing' ? (
-                <Loader2 className="h-6 w-6 text-blue-600 animate-spin" />
-              ) : result.status === 'complete' ? (
-                <CheckCircle className="h-6 w-6 text-green-600" />
-              ) : (
-                <AlertCircle className="h-6 w-6 text-red-600" />
-              )}
-              <div>
-                <p
-                  className={`font-medium ${
-                    result.status === 'complete'
-                      ? 'text-green-800'
-                      : result.status === 'failed'
-                        ? 'text-red-800'
-                        : 'text-blue-800'
-                  }`}
-                >
-                  {result.status === 'processing'
-                    ? 'Extraction in progress...'
-                    : result.status === 'complete'
-                      ? 'Extraction completed successfully'
-                      : 'Extraction failed'}
-                </p>
-                {result.status === 'processing' && (
-                  <p className="text-sm text-blue-600 mt-1">
-                    Upload ID: {result.upload_id}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Results */}
-            {result.status === 'complete' && (
-              <div className="grid grid-cols-2 gap-4 mt-4">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">Courses Found</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {result.courses_found}
-                  </p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">Duplicates Removed</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {result.dupes_removed}
-                  </p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">Processing Time</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {(result.processing_ms! / 1000).toFixed(1)}s
-                  </p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">School Slug</p>
-                  <p className="text-lg font-mono text-gray-900">
-                    {result.school_slug}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {result.status === 'failed' && (
-              <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-                <p className="text-sm font-medium text-red-800">Error Details</p>
-                <p className="text-sm text-red-700 mt-1">{result.error_message}</p>
-              </div>
-            )}
-
-            {/* Next Action */}
-            {result.status === 'complete' && (
-              <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-sm text-blue-900 mb-3">
-                  <span className="font-medium">Next step:</span> Go to the Mapping
-                  page to run the 27-pass course matching engine.
-                </p>
-                <a
-                  href="/mapping"
-                  className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-                >
-                  View Mapping Results →
-                </a>
-              </div>
-            )}
-
-            {/* Reset Button */}
-            <button
-              onClick={() => {
-                setResult(null)
-                setSchoolName('')
-                setFile(null)
-                setError(null)
-              }}
-              className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
-            >
-              Extract Another PDF
-            </button>
+      <div style={{ background: 'linear-gradient(135deg, #1a1229 0%, #0d0b14 100%)', borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '14px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #603AC8, #31225C)', display: 'grid', placeItems: 'center' }}>📚</div>
+          <div>
+            <div style={{ fontWeight: 700, color: '#fff', fontSize: 15 }}>Planpaths Course Extractor</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontFamily: "'DM Mono', monospace" }}>Powered by Gemini 2.5 Flash</div>
           </div>
-        )}
+        </div>
+        <div className='hide-sm' style={{ fontSize: 12, color: 'rgba(255,255,255,.35)', fontFamily: "'DM Mono', monospace" }}>
+          {uploadId ? `Upload ${uploadId.slice(0, 8)}...` : 'Ready'}
+        </div>
       </div>
 
-      {/* Info Box */}
-      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <p className="text-sm text-blue-900">
-          <span className="font-medium">How it works:</span> Upload a school course catalog
-          PDF. The system will automatically extract course codes, names, and categories using
-          AI, then store them in the database for mapping to your state's master database.
-        </p>
+      <div className='layout' style={{ flex: 1, display: 'flex', height: 'calc(100vh - 61px)', overflow: 'hidden' }}>
+        <div className='left panel' style={{ width: 320, borderRight: '1px solid rgba(255,255,255,0.07)', padding: 20, background: '#110e1c', display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto' }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: 1, marginBottom: 8 }}>SCHOOL</div>
+            <input value={schoolName} onChange={e => setSchoolName(e.target.value)} placeholder='School name' style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.04)', color: '#e2e0ea' }} />
+          </div>
+
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: 1, marginBottom: 8 }}>STATE</div>
+            <select value={state} onChange={e => setState(e.target.value)} style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.04)', color: '#e2e0ea' }}>
+              {STATE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: 1, marginBottom: 8 }}>SOURCE FILE</div>
+            <input ref={fileInputRef} type='file' accept='.pdf' style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) void handleFile(f) }} />
+            <div onClick={() => fileInputRef.current?.click()} onDragOver={e => { e.preventDefault(); setIsDragging(true) }} onDragLeave={() => setIsDragging(false)} onDrop={e => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) void handleFile(f) }} style={{ border: `2px dashed ${isDragging ? '#603AC8' : 'rgba(255,255,255,0.1)'}`, borderRadius: 10, padding: '16px 12px', textAlign: 'center', cursor: 'pointer', background: isDragging ? 'rgba(96,58,200,.1)' : 'rgba(255,255,255,.02)' }}>
+              <div style={{ marginBottom: 6, color: 'rgba(255,255,255,.3)' }}>⬆</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,.65)', marginBottom: 4 }}>{fileName}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,.25)' }}>PDF · max 50MB</div>
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: 1, marginBottom: 8 }}>API KEY</div>
+            <select value={selectedApiKey} onChange={e => setSelectedApiKey(e.target.value)} style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.04)', color: '#e2e0ea' }}>
+              <option value='auto'>🤖 Auto-select best key</option>
+              {apiKeys.map(k => (
+                <option key={k.id} value={k.id} disabled={!k.is_active}>
+                  {k.nickname} ({k.quota_remaining}/{k.quota_limit})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: 1, marginBottom: 8 }}>PAGE RANGE</div>
+            <select value={selectedRange} onChange={e => setSelectedRange(e.target.value)} disabled={!file} style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.04)', color: '#e2e0ea' }}>
+              <option value='all'>All pages (1–{Math.max(totalPages, 1)})</option>
+              {ranges.map(r => <option key={`${r.start}-${r.end}`} value={`${r.start}-${r.end}`}>{r.label}</option>)}
+            </select>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', marginTop: 6 }}>{totalPages > 0 ? `Detected ${totalPages} pages` : 'Upload a PDF to detect pages'}</div>
+          </div>
+
+          <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <button onClick={handleExtract} disabled={status === 'extracting'} style={{ padding: '12px 0', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #603AC8, #31225C)', color: '#fff', fontWeight: 700, cursor: status === 'extracting' ? 'not-allowed' : 'pointer', opacity: status === 'extracting' ? 0.6 : 1 }}>
+              {status === 'extracting' ? `Extracting… ${elapsed}s` : '⚡ Extract Courses'}
+            </button>
+            {error && <div style={{ fontSize: 12, color: '#fca5a5', background: 'rgba(127,29,29,.35)', border: '1px solid rgba(248,113,113,.35)', borderRadius: 8, padding: '8px 10px' }}>{error}</div>}
+          </div>
+        </div>
+
+        <div className='panel' style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 20, gap: 16, overflow: 'hidden' }}>
+          <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,.07)', background: '#1a1229', padding: '16px 20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', fontWeight: 600 }}>{status === 'extracting' ? 'EXTRACTION IN PROGRESS' : 'EXTRACTION OUTPUT'}</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', fontFamily: "'DM Mono', monospace" }}>{filteredCourses.length} courses</div>
+            </div>
+            <div style={{ height: 4, borderRadius: 3, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}>
+              <div style={{ width: status === 'idle' ? '0%' : status === 'extracting' ? '65%' : '100%', height: '100%', background: 'linear-gradient(90deg,#603AC8,#a78bfa)', transition: 'width .3s ease' }} />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, background: 'rgba(255,255,255,.05)', padding: '8px 12px', maxWidth: 340, width: '100%' }}>
+              <span style={{ opacity: 0.6 }}>🔍</span>
+              <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder='Search courses, codes, categories…' style={{ border: 'none', outline: 'none', width: '100%', background: 'none', color: '#e2e0ea' }} />
+            </div>
+            <div className='hide-sm' style={{ fontSize: 12, color: 'rgba(255,255,255,.3)', fontFamily: "'DM Mono', monospace" }}>{filteredCourses.length} shown</div>
+          </div>
+
+          <div style={{ flex: 1, overflow: 'auto', border: '1px solid rgba(255,255,255,.07)', borderRadius: 12 }}>
+            {filteredCourses.length === 0 ? (
+              <div style={{ padding: 60, textAlign: 'center', color: 'rgba(255,255,255,.2)' }}>{status === 'extracting' ? 'Processing PDF…' : 'No courses yet. Run extraction to see results.'}</div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                  <tr style={{ background: '#1a1229', borderBottom: '1px solid rgba(255,255,255,.07)' }}>
+                    {['#', 'Category', 'Course Name', 'Code', 'Grade', 'Credit', 'Length'].map(h => (
+                      <th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontSize: 10, letterSpacing: 0.8, color: 'rgba(255,255,255,.35)', fontFamily: "'DM Mono', monospace" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredCourses.map((course, index) => (
+                    <tr key={course.id} style={{ borderBottom: '1px solid rgba(255,255,255,.03)' }}>
+                      <td style={{ padding: '9px 14px', color: 'rgba(255,255,255,.22)', fontFamily: "'DM Mono', monospace" }}>{index + 1}</td>
+                      <td style={{ padding: '9px 14px' }}>
+                        <span style={{ display: 'inline-flex', padding: '2px 8px', borderRadius: 4, fontSize: 11, background: `${(COLORS[course.category] || '#6b7280')}22`, border: `1px solid ${(COLORS[course.category] || '#6b7280')}44`, color: COLORS[course.category] || '#6b7280' }}>{course.category}</span>
+                      </td>
+                      <td style={{ padding: '9px 14px', color: '#e2e0ea' }}>{course.name}</td>
+                      <td style={{ padding: '9px 14px', color: 'rgba(255,255,255,.45)', fontFamily: "'DM Mono', monospace" }}>{course.code}</td>
+                      <td style={{ padding: '9px 14px', color: 'rgba(255,255,255,.55)' }}>{course.grade}</td>
+                      <td style={{ padding: '9px 14px', color: 'rgba(255,255,255,.55)', fontFamily: "'DM Mono', monospace" }}>{course.credit}</td>
+                      <td style={{ padding: '9px 14px', color: course.length === 'Y' ? '#67e8f9' : '#fbbf24', fontFamily: "'DM Mono', monospace", fontSize: 10 }}>{course.length === 'Y' ? 'Full Year' : 'Semester'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', fontFamily: "'DM Mono', monospace" }}>
+            {recent.length > 0 ? recent.map(r => `${r.name} · ${r.status} · ${r.courses} courses · ${relTime(r.ts)}`).join('  |  ') : 'No recent extraction runs'}
+          </div>
+        </div>
       </div>
     </div>
   )
