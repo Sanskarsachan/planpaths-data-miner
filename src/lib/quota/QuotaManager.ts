@@ -131,73 +131,102 @@ export class QuotaManager {
    * Uses round-robin strategy: picks key with most remaining quota
    * Falls back gracefully if quota system unavailable
    */
-  async selectNextApiKey(): Promise<ApiKey | null> {
+  async selectNextApiKey(attemptNum = 1): Promise<ApiKey | null> {
     try {
       // Use RPC function that handles quota reset
       const { data, error } = await this.supabase.rpc('select_best_available_api_key')
 
       if (error) {
-        this.logger(`Warning: Key selection failed (${error.message}), using fallback`, 'warn')
-        // Return mock key that uses GEMINI_API_KEY env var
-        return {
-          id: 'fallback-default',
-          nickname: 'Fallback (env var)',
-          key: process.env.GEMINI_API_KEY || '',
-          is_active: true,
-          is_deleted: false,
-          quota_daily_limit: 20,
-          quota_used_today: 0,
-          quota_remaining: 20,
-          quota_reset_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          total_requests: 0,
-          total_tokens_used: 0,
-          estimated_cost_cents: 0,
-          created_at: new Date().toISOString(),
+        this.logger(`[QuotaManager] RPC failed: ${error.message} | Attempt ${attemptNum}/3 | Fallback: direct lookup`, 'warn')
+        const directKey = await this.selectDirectAvailableApiKey()
+        if (directKey) {
+          this.logger(`[QuotaManager] Selected key via direct query: ${directKey.nickname} (ID: ${directKey.id.substring(0, 8)}...) | Remaining: ${directKey.quota_remaining}/${directKey.quota_daily_limit}`, 'info')
+          return directKey
         }
+        const fallback = this.getEnvFallbackKey()
+        this.logger(`[QuotaManager] No Supabase keys available, using env fallback: ${fallback.nickname}`, 'warn')
+        return fallback
       }
 
-      if (!data || !data[0]) {
-        this.logger('No available API keys, using fallback', 'warn')
-        return {
-          id: 'fallback-default',
-          nickname: 'Fallback (env var)',
-          key: process.env.GEMINI_API_KEY || '',
-          is_active: true,
-          is_deleted: false,
-          quota_daily_limit: 20,
-          quota_used_today: 0,
-          quota_remaining: 20,
-          quota_reset_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          total_requests: 0,
-          total_tokens_used: 0,
-          estimated_cost_cents: 0,
-          created_at: new Date().toISOString(),
-        }
-      }
+      const keyId = Array.isArray(data) ? data[0] : data
 
-      const keyId = data[0]
+      if (!keyId) {
+        this.logger(`[QuotaManager] RPC returned empty | Attempt ${attemptNum}/3 | Fallback: direct lookup`, 'warn')
+        const directKey = await this.selectDirectAvailableApiKey()
+        if (directKey) {
+          this.logger(`[QuotaManager] Selected key via direct query: ${directKey.nickname} (ID: ${directKey.id.substring(0, 8)}...) | Remaining: ${directKey.quota_remaining}/${directKey.quota_daily_limit}`, 'info')
+          return directKey
+        }
+        const fallback = this.getEnvFallbackKey()
+        this.logger(`[QuotaManager] No Supabase keys available, using env fallback: ${fallback.nickname}`, 'warn')
+        return fallback
+      }
 
       // Fetch the full key details
-      return await this.getApiKey(keyId)
-    } catch (err: any) {
-      this.logger(`Warning: Key selection error (${err.message}), using fallback`, 'warn')
-      // Return fallback key
-      return {
-        id: 'fallback-default',
-        nickname: 'Fallback (env var)',
-        key: process.env.GEMINI_API_KEY || '',
-        is_active: true,
-        is_deleted: false,
-        quota_daily_limit: 20,
-        quota_used_today: 0,
-        quota_remaining: 20,
-        quota_reset_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        total_requests: 0,
-        total_tokens_used: 0,
-        estimated_cost_cents: 0,
-        created_at: new Date().toISOString(),
+      const selectedKey = await this.getApiKey(keyId)
+      if (selectedKey?.key) {
+        this.logger(`[QuotaManager] Selected key via RPC: ${selectedKey.nickname} (ID: ${selectedKey.id.substring(0, 8)}...) | Remaining: ${selectedKey.quota_remaining}/${selectedKey.quota_daily_limit}`, 'info')
+        return selectedKey
       }
+
+      this.logger(`[QuotaManager] RPC key ${keyId.substring(0, 8)}... not found | Fallback: direct lookup`, 'warn')
+      const directKey = await this.selectDirectAvailableApiKey()
+      if (directKey) {
+        this.logger(`[QuotaManager] Selected key via direct query: ${directKey.nickname} (ID: ${directKey.id.substring(0, 8)}...) | Remaining: ${directKey.quota_remaining}/${directKey.quota_daily_limit}`, 'info')
+        return directKey
+      }
+
+      const fallback = this.getEnvFallbackKey()
+      this.logger(`[QuotaManager] No Supabase keys available, using env fallback: ${fallback.nickname}`, 'warn')
+      return fallback
+    } catch (err: any) {
+      this.logger(`[QuotaManager] Exception during key selection: ${err.message} | Fallback: direct lookup`, 'error')
+      const directKey = await this.selectDirectAvailableApiKey()
+      if (directKey) {
+        this.logger(`[QuotaManager] Selected key via direct query (after exception): ${directKey.nickname} (ID: ${directKey.id.substring(0, 8)}...) | Remaining: ${directKey.quota_remaining}/${directKey.quota_daily_limit}`, 'info')
+        return directKey
+      }
+      const fallback = this.getEnvFallbackKey()
+      this.logger(`[QuotaManager] No Supabase keys available, using env fallback: ${fallback.nickname}`, 'warn')
+      return fallback
     }
+  }
+
+  private getEnvFallbackKey(): ApiKey {
+    return {
+      id: 'fallback-default',
+      nickname: 'Fallback (env var)',
+      key: process.env.GEMINI_API_KEY || '',
+      is_active: true,
+      is_deleted: false,
+      quota_daily_limit: 20,
+      quota_used_today: 0,
+      quota_remaining: 20,
+      quota_reset_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      total_requests: 0,
+      total_tokens_used: 0,
+      estimated_cost_cents: 0,
+      created_at: new Date().toISOString(),
+    }
+  }
+
+  private async selectDirectAvailableApiKey(): Promise<ApiKey | null> {
+    const { data, error } = await this.supabase
+      .from('api_keys')
+      .select('*')
+      .eq('is_active', true)
+      .eq('is_deleted', false)
+      .order('quota_used_today', { ascending: true })
+      .limit(1)
+
+    if (error || !data?.[0]) {
+      this.logger(`[QuotaManager] Direct key lookup failed: ${error?.message || 'no active keys found'}`, 'warn')
+      return null
+    }
+
+    const key = this.formatApiKey(data[0])
+    this.logger(`[QuotaManager] Found direct key: ${key.nickname} (ID: ${key.id.substring(0, 8)}...) | Remaining: ${key.quota_remaining}/${key.quota_daily_limit}`, 'info')
+    return key
   }
 
   /**
@@ -451,6 +480,50 @@ export class QuotaManager {
     } catch (err: any) {
       this.logger(`Fatal error adding key: ${err.message}`, 'error')
       return null
+    }
+  }
+
+  /**
+   * Log and track API key errors
+   * Helps identify which keys are failing and why
+   */
+  async recordKeyError(apiKeyId: string, errorMessage: string, statusCode?: number): Promise<void> {
+    try {
+      // Parse error type
+      let errorType = 'other'
+      if (errorMessage.includes('leaked')) {
+        errorType = 'leaked_key'
+      } else if (errorMessage.includes('quota') || statusCode === 429) {
+        errorType = 'quota_exceeded'
+      } else if (errorMessage.includes('unauthorized') || errorMessage.includes('invalid') || statusCode === 403) {
+        errorType = 'invalid_key'
+      } else if (statusCode === 401) {
+        errorType = 'unauthorized'
+      }
+
+      this.logger(`[KeyError] KeyID: ${apiKeyId.substring(0, 8)}... | Type: ${errorType} | Code: ${statusCode || 'N/A'} | Msg: ${errorMessage.substring(0, 80)}`, 'error')
+
+      // Log to usage table for metrics
+      const { error } = await this.supabase
+        .from('api_usage_logs')
+        .insert({
+          api_key_id: apiKeyId,
+          status: 'error',
+          error_message: `${errorType}: ${errorMessage}`,
+          request_type: 'gemini_extract',
+        })
+
+      if (error) {
+        this.logger(`[KeyError] Failed to log error: ${error.message}`, 'warn')
+      }
+
+      // If it's a permanently failed key, deactivate it
+      if (errorType === 'leaked_key') {
+        this.logger(`[KeyError] Deactivating leaked key: ${apiKeyId.substring(0, 8)}...`, 'warn')
+        await this.deactivateApiKey(apiKeyId)
+      }
+    } catch (err: any) {
+      this.logger(`[KeyError] Exception recording error: ${err.message}`, 'error')
     }
   }
 

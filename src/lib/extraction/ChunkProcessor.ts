@@ -81,6 +81,15 @@ interface PageChunk {
   lastCategory: string
 }
 
+export interface ChunkCompletePayload {
+  chunkNum: number
+  total: number
+  pageStart: number
+  pageEnd: number
+  courses: Course[]
+  tokensUsed: number
+}
+
 export function detectFormat(text: string): DocFormat {
   const hasPipeHeaders = /\|[A-Z][A-Z &/\-]{2,}\|/.test(text)
   const has7DigitCodes = /\d{7}/.test(text)
@@ -171,6 +180,62 @@ function splitOversizedBatch(
     return [{ text, pageStart, pageEnd, prevContext, lastCategory }]
   }
 
+  const rawPages = text
+    .split(PAGE_BREAK_MARKER)
+    .map(p => p.trim())
+    .filter(Boolean)
+
+  if (rawPages.length > 1) {
+    const byPages: Omit<PageChunk, 'chunkIndex' | 'totalChunks'>[] = []
+    let currentText = ''
+    let currentStart = pageStart
+    let currentEnd = pageStart
+    let isFirst = true
+    let runningCategory = lastCategory
+
+    for (let idx = 0; idx < rawPages.length; idx++) {
+      const absolutePage = pageStart + idx
+      const pageText = rawPages[idx]
+      const nextText = currentText
+        ? `${currentText}\n${PAGE_BREAK_MARKER}\n${pageText}`
+        : pageText
+
+      if (nextText.length > MAX_CHUNK_CHARS && currentText.length > 0) {
+        byPages.push({
+          text: currentText,
+          pageStart: currentStart,
+          pageEnd: currentEnd,
+          prevContext: isFirst ? prevContext : currentText.slice(-CONTEXT_OVERLAP),
+          lastCategory: runningCategory,
+        })
+
+        runningCategory = extractLastCategory(currentText) || runningCategory
+        currentText = pageText
+        currentStart = absolutePage
+        currentEnd = absolutePage
+        isFirst = false
+      } else {
+        currentText = nextText
+        currentEnd = absolutePage
+      }
+    }
+
+    if (currentText.trim().length >= MIN_TEXT_CHARS) {
+      byPages.push({
+        text: currentText,
+        pageStart: currentStart,
+        pageEnd: currentEnd,
+        prevContext: isFirst ? prevContext : currentText.slice(-CONTEXT_OVERLAP),
+        lastCategory: runningCategory,
+      })
+    }
+
+    if (byPages.length > 1) {
+      console.warn(`[ChunkProcessor] Oversized batch (pages ${pageStart}-${pageEnd}) → ${byPages.length} sub-chunks`)
+      return byPages
+    }
+  }
+
   const paragraphs = text.split(/\n{2,}/)
   const parts: Omit<PageChunk, 'chunkIndex' | 'totalChunks'>[] = []
   let current = ''
@@ -214,6 +279,7 @@ function extractLastCategory(text: string): string {
 export class ChunkProcessor {
 
   private pagesPerBatch: number
+  private onChunkComplete: (payload: ChunkCompletePayload) => Promise<void> | void
 
   private usageStats: APIUsageStats = {
     tokensUsedToday     : 0,
@@ -230,8 +296,10 @@ export class ChunkProcessor {
     private apiKeyId   : string = '',
     private apiKey     : string = '',
     pagesPerBatch      : number = DEFAULT_PAGES_BATCH,
+    onChunkComplete: (payload: ChunkCompletePayload) => Promise<void> | void = () => {},
   ) {
     this.pagesPerBatch = pagesPerBatch
+    this.onChunkComplete = onChunkComplete
   }
 
   getUsageStats(): APIUsageStats {
@@ -302,6 +370,15 @@ export class ChunkProcessor {
         this.recordTokenUsage(tokensUsed, courses.length, pagesInChunk)
 
         allCourses.push(...courses)
+
+        await this.onChunkComplete({
+          chunkNum,
+          total,
+          pageStart: chunk.pageStart,
+          pageEnd: chunk.pageEnd,
+          courses,
+          tokensUsed,
+        })
 
         this.onProgress({
           status          : 'chunk_complete',
@@ -387,26 +464,31 @@ export class ChunkProcessor {
       ? `[CONTEXT FROM PREVIOUS PAGES — do not re-extract these, use only for section continuity]\n${chunk.prevContext}\n[END CONTEXT]\n\n${chunk.text}`
       : chunk.text
 
-    const controller = new AbortController()
-    const timeoutId  = setTimeout(() => controller.abort(), VERCEL_TIMEOUT_MS)
-
     try {
-      console.log(`[ChunkProcessor] → Gemini API | attempt ${attempt}/${RETRY_ATTEMPTS} | pages ${chunk.pageStart}-${chunk.pageEnd} | ${textToSend.length} chars`)
+      const keyDisplay = this.apiKeyId.substring(0, 8) + (this.apiKeyId.length > 8 ? '...' : '')
+      console.log(`[ChunkProcessor] → Gemini API | attempt ${attempt}/${RETRY_ATTEMPTS} | pages ${chunk.pageStart}-${chunk.pageEnd} | ${textToSend.length} chars | keyId=${keyDisplay}`)
 
       const genAI = new GoogleGenerativeAI(this.apiKey)
       const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
 
       const prompt = this.buildPrompt(chunk, format)
 
-      const result = await model.generateContent(prompt)
+      const result = await Promise.race([
+        model.generateContent(prompt),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => {
+            const timeoutError = new Error(`Gemini request timed out after ${VERCEL_TIMEOUT_MS}ms`)
+            ;(timeoutError as any).name = 'AbortError'
+            reject(timeoutError)
+          }, VERCEL_TIMEOUT_MS)
+        ),
+      ])
       const text = result.response.text()
 
       const usageMetadata = (result.response as any).usageMetadata || {}
       const promptTokens = usageMetadata.promptTokenCount || 0
       const completionTokens = usageMetadata.candidatesTokenCount || 0
       const totalTokens = promptTokens + completionTokens
-
-      clearTimeout(timeoutId)
 
       const cleaned = text
         .replace(/^```json\s*/i, '')
@@ -432,12 +514,30 @@ export class ChunkProcessor {
       return { courses: processed, tokensUsed: totalTokens }
 
     } catch (error: any) {
+      const keyDisplay = this.apiKeyId.substring(0, 8) + (this.apiKeyId.length > 8 ? '...' : '')
+      const errorMsg = error?.message || String(error)
+      const statusCode = error?.status || error?.statusCode
 
-      clearTimeout(timeoutId)
+      // Identify error type
+      let errorType = 'unknown'
+      if (errorMsg.includes('leaked')) {
+        errorType = 'LEAKED_KEY'
+      } else if (errorMsg.includes('quota') || statusCode === 429) {
+        errorType = 'QUOTA_EXCEEDED'
+      } else if (errorMsg.includes('unauthorized') || statusCode === 401) {
+        errorType = 'UNAUTHORIZED'
+      } else if (errorMsg.includes('invalid') || statusCode === 403) {
+        errorType = 'INVALID_KEY'
+      } else if (error.name === 'AbortError') {
+        errorType = 'TIMEOUT'
+      }
+
+      console.error(`[ChunkProcessor] ERROR (${errorType}) | KeyId=${keyDisplay} | Attempt ${attempt}/${RETRY_ATTEMPTS} | Pages ${chunk.pageStart}-${chunk.pageEnd} | Status: ${statusCode || 'N/A'} | Message: ${errorMsg.substring(0, 100)}`)
 
       if (error.name === 'AbortError') {
         console.error(`[ChunkProcessor] Timeout after ${VERCEL_TIMEOUT_MS}ms (pages ${chunk.pageStart}-${chunk.pageEnd})`)
         if (attempt < RETRY_ATTEMPTS) {
+          console.log(`[ChunkProcessor] Timeout retry ${attempt}/${RETRY_ATTEMPTS}...`)
           await sleep(RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1))
           return this.processChunk(chunk, filename, format, attempt + 1)
         }
@@ -445,18 +545,30 @@ export class ChunkProcessor {
         return { courses: [], tokensUsed: 0 }
       }
 
-      if (error?.isRateLimit) throw error
+      // Log fatal errors
+      if (errorType === 'LEAKED_KEY' || errorType === 'QUOTA_EXCEEDED' || errorType === 'INVALID_KEY') {
+        console.error(`[ChunkProcessor] FATAL ERROR (${errorType}): Key ${keyDisplay} is unusable | Pages: ${chunk.pageStart}-${chunk.pageEnd}`)
+        console.error(`[ChunkProcessor] Error details: ${errorMsg}`)
+      }
+
+      if (error?.isRateLimit) {
+        console.error('[ChunkProcessor] Rate limit error (non-retryable)')
+        throw error
+      }
 
       if (isNetworkError(error) && attempt < RETRY_ATTEMPTS) {
+        console.log(`[ChunkProcessor] Network error, retrying ${attempt}/${RETRY_ATTEMPTS}...`)
         await sleep(RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1))
         return this.processChunk(chunk, filename, format, attempt + 1)
       }
 
       if (attempt < RETRY_ATTEMPTS && !(error instanceof SyntaxError)) {
+        console.log(`[ChunkProcessor] Retrying (${errorType}): attempt ${attempt}/${RETRY_ATTEMPTS}...`)
         await sleep(RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1))
         return this.processChunk(chunk, filename, format, attempt + 1)
       }
 
+      console.error(`[ChunkProcessor] All retries exhausted for pages ${chunk.pageStart}-${chunk.pageEnd}`)
       throw error
     }
   }
