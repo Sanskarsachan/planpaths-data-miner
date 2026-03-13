@@ -1,8 +1,35 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Header } from './Header'
 
 type Status = 'idle' | 'extracting' | 'done' | 'failed'
+
+async function detectPdfPageCount(file: File): Promise<number> {
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const res = await fetch('/api/pdf-metadata', {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!res.ok) {
+      return 1
+    }
+
+    const payload = await res.json()
+    if (!payload || typeof payload.numPages !== 'number' || payload.numPages < 1) {
+      return 1
+    }
+
+    return payload.numPages
+  } catch (error) {
+    console.error('[PDF] Error:', error)
+    return 1
+  }
+}
 
 type Course = {
   id: number
@@ -47,15 +74,6 @@ const COLORS: Record<string, string> = {
 
 const STATE_OPTIONS = ['Florida', 'Texas', 'California']
 
-function detectPdfPageCount(text: string): number {
-  const matches = [...text.matchAll(/\/Count\s+(\d+)/g)]
-  const values = matches.map(m => parseInt(m[1], 10)).filter(n => Number.isFinite(n) && n > 0 && n < 100000)
-  if (values.length > 0) return Math.max(...values)
-  const pageMatches = text.match(/\/Type\s*\/Page(?!s)/g)
-  if (pageMatches?.length) return pageMatches.length
-  return 1
-}
-
 function buildRanges(totalPages: number): RangeOption[] {
   const ranges: RangeOption[] = []
   for (let page = 1; page <= totalPages; page += 5) {
@@ -72,6 +90,13 @@ function relTime(ts: number): string {
   if (d < 3600) return `${Math.floor(d / 60)}m ago`
   if (d < 86400) return `${Math.floor(d / 3600)}h ago`
   return `${Math.floor(d / 86400)}d ago`
+}
+
+function getRangeLabel(selectedRange: string, totalPages: number): string {
+  if (selectedRange === 'all') return `All pages (1–${Math.max(totalPages, 1)})`
+  const [start, end] = selectedRange.split('-').map(v => parseInt(v, 10))
+  if (Number.isFinite(start) && Number.isFinite(end)) return `Pages ${start}–${end}`
+  return selectedRange
 }
 
 export function ExtractForm() {
@@ -98,8 +123,26 @@ export function ExtractForm() {
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [isHydrated, setIsHydrated] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [saveMessage, setSaveMessage] = useState('')
 
   const ranges = useMemo(() => (totalPages > 0 ? buildRanges(totalPages) : []), [totalPages])
+  const selectedRangeLabel = useMemo(() => getRangeLabel(selectedRange, totalPages), [selectedRange, totalPages])
+  const selectedApiKeyMeta = useMemo(
+    () => apiKeys.find(k => k.id === selectedApiKey) ?? null,
+    [apiKeys, selectedApiKey]
+  )
+  const estimatedApiCalls = useMemo(() => {
+    const pages = selectedRange === 'all'
+      ? Math.max(totalPages, 1)
+      : (() => {
+          const [start, end] = selectedRange.split('-').map(v => parseInt(v, 10))
+          if (!Number.isFinite(start) || !Number.isFinite(end)) return 1
+          return Math.max(1, end - start + 1)
+        })()
+    return Math.max(1, Math.ceil(pages / 5))
+  }, [selectedRange, totalPages])
 
   const filteredCourses = useMemo(
     () =>
@@ -111,6 +154,46 @@ export function ExtractForm() {
       ),
     [courses, searchQ]
   )
+
+  // Load persisted data on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('planpaths-extraction-data')
+      if (saved) {
+        const data = JSON.parse(saved)
+        if (data.courses) setCourses(data.courses)
+        if (data.schoolName) setSchoolName(data.schoolName)
+        if (data.state) setState(data.state)
+        if (data.fileName) setFileName(data.fileName)
+        if (data.recent) setRecent(data.recent)
+        if (data.totalPages) setTotalPages(data.totalPages)
+        if (data.uploadId) setUploadId(data.uploadId)
+      }
+    } catch (err) {
+      console.warn('Failed to load saved extraction data:', err)
+    }
+    setIsHydrated(true)
+  }, [])
+
+  // Persist data whenever it changes
+  useEffect(() => {
+    if (!isHydrated) return // Don't save until initial load is complete
+    try {
+      const data = {
+        courses,
+        schoolName,
+        state,
+        fileName,
+        recent,
+        totalPages,
+        uploadId,
+        savedAt: Date.now(),
+      }
+      localStorage.setItem('planpaths-extraction-data', JSON.stringify(data))
+    } catch (err) {
+      console.warn('Failed to save extraction data:', err)
+    }
+  }, [courses, schoolName, state, fileName, recent, totalPages, uploadId, isHydrated])
 
   useEffect(() => {
     const loadKeys = async () => {
@@ -153,8 +236,20 @@ export function ExtractForm() {
         continue
       }
 
+      // Update UI with courses as they're extracted (real-time accumulation)
+      if (data.status === 'processing' || data.status === 'complete') {
+        const newCourses = Array.isArray(data.courses) ? data.courses : []
+        if (newCourses.length > 0) {
+          setCourses(prev => {
+            // Deduplicate by course code to avoid exact duplicates
+            const existingCodes = new Set(prev.map(c => c.code))
+            const dedupedNew = newCourses.filter(c => !existingCodes.has(c.code) || !c.code)
+            return [...prev, ...dedupedNew]
+          })
+        }
+      }
+
       if (data.status === 'complete') {
-        setCourses(Array.isArray(data.courses) ? data.courses : [])
         setStatus('done')
         setRecent(prev => [
           { id, name: fileName, status: 'completed', courses: data.courses_found ?? 0, ts: Date.now() },
@@ -186,9 +281,7 @@ export function ExtractForm() {
     setError(null)
 
     try {
-      const buff = await incoming.arrayBuffer()
-      const text = new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(buff))
-      const pages = detectPdfPageCount(text)
+      const pages = await detectPdfPageCount(incoming)
       setTotalPages(pages)
       setSelectedRange('all')
     } catch {
@@ -197,13 +290,110 @@ export function ExtractForm() {
     }
   }
 
+  const clearAllData = () => {
+    if (confirm('Clear all extracted courses and reset form?')) {
+      setCourses([])
+      setRecent([])
+      setSchoolName('')
+      setFileName('Drop PDF here')
+      setFile(null)
+      setTotalPages(0)
+      setUploadId(null)
+      setError(null)
+      setSearchQ('')
+      setSaveStatus('idle')
+      setSaveMessage('')
+      localStorage.removeItem('planpaths-extraction-data')
+    }
+  }
+
+  const saveToDatabase = async () => {
+    if (courses.length === 0) {
+      setSaveMessage('No courses to save')
+      return
+    }
+
+    if (!uploadId || !schoolName || !state) {
+      setSaveMessage('Missing upload info. Please re-extract.')
+      return
+    }
+
+    setSaveStatus('saving')
+    setSaveMessage('Saving to database...')
+
+    try {
+      const slug = schoolName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+      
+      const res = await fetch('/api/courses/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uploadId,
+          schoolSlug: slug,
+          stateCode: state === 'Florida' ? 'FL' : state === 'Texas' ? 'TX' : 'CA',
+          courses,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setSaveStatus('error')
+        setSaveMessage(data.error || 'Failed to save')
+        return
+      }
+
+      setSaveStatus('saved')
+      setSaveMessage(`✓ Saved ${data.saved} courses to database`)
+      
+      setTimeout(() => {
+        setSaveStatus('idle')
+        setSaveMessage('')
+      }, 5000)
+    } catch (err: any) {
+      setSaveStatus('error')
+      setSaveMessage(err.message || 'Network error')
+    }
+  }
+
+  const exportToCSV = () => {
+    if (filteredCourses.length === 0) {
+      alert('No courses to export')
+      return
+    }
+
+    const headers = ['#', 'Category', 'Course Name', 'Code', 'Grade', 'Credit', 'Length']
+    const rows = filteredCourses.map((course, index) => [
+      index + 1,
+      course.category,
+      course.name,
+      course.code,
+      course.grade,
+      course.credit,
+      course.length === 'Y' ? 'Full Year' : 'Semester',
+    ])
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(',')),
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${schoolName || 'courses'}-${state}-${new Date().toISOString().split('T')[0]}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   const handleExtract = async () => {
     if (!file) return setError('Please upload a PDF')
     if (!schoolName.trim()) return setError('Please enter school name')
 
     setStatus('extracting')
     setElapsed(0)
-    setCourses([])
+    // Don't clear courses - keep showing previous results while new range extracts
     setError(null)
 
     const formData = new FormData()
@@ -237,28 +427,17 @@ export function ExtractForm() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0d0b14', color: '#e2e0ea', fontFamily: "'DM Sans', sans-serif", display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: '#0d0b14', color: '#e2e0ea', fontFamily: "'DM Sans', sans-serif", display: 'flex', flexDirection: 'column', scrollbarGutter: 'stable' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
-        *{box-sizing:border-box}
+        *{box-sizing:border-box;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
         @media (max-width:1024px){.layout{flex-direction:column;height:auto!important}.left{width:100%!important;border-right:none!important;border-bottom:1px solid rgba(255,255,255,.07)}}
-        @media (max-width:640px){.panel{padding:14px!important}.hide-sm{display:none!important}}
+        @media (max-width:640px){.panel{padding:14px!important}.hide-sm{display:none!important}.extract-actions{justify-content:flex-start!important}}
       `}</style>
 
-      <div style={{ background: 'linear-gradient(135deg, #1a1229 0%, #0d0b14 100%)', borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '14px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #603AC8, #31225C)', display: 'grid', placeItems: 'center' }}>📚</div>
-          <div>
-            <div style={{ fontWeight: 700, color: '#fff', fontSize: 15 }}>Planpaths Course Extractor</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontFamily: "'DM Mono', monospace" }}>Powered by Gemini 2.5 Flash</div>
-          </div>
-        </div>
-        <div className='hide-sm' style={{ fontSize: 12, color: 'rgba(255,255,255,.35)', fontFamily: "'DM Mono', monospace" }}>
-          {uploadId ? `Upload ${uploadId.slice(0, 8)}...` : 'Ready'}
-        </div>
-      </div>
+      <Header />
 
-      <div className='layout' style={{ flex: 1, display: 'flex', height: 'calc(100vh - 61px)', overflow: 'hidden' }}>
+      <div className='layout' style={{ flex: 1, display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
         <div className='left panel' style={{ width: 320, borderRight: '1px solid rgba(255,255,255,0.07)', padding: 20, background: '#110e1c', display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto' }}>
           <div>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: 1, marginBottom: 8 }}>SCHOOL</div>
@@ -292,6 +471,18 @@ export function ExtractForm() {
                 </option>
               ))}
             </select>
+            <div style={{ marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,.45)' }}>
+              {selectedApiKey === 'auto'
+                ? '🤖 Auto-select best key'
+                : selectedApiKeyMeta
+                  ? `✓ ${selectedApiKeyMeta.nickname} (${selectedApiKeyMeta.quota_remaining}/${selectedApiKeyMeta.quota_limit})`
+                  : 'Selected key unavailable'}
+            </div>
+            {selectedApiKeyMeta && (
+              <div style={{ marginTop: 2, fontSize: 10, color: 'rgba(255,255,255,.28)' }}>
+                {selectedApiKeyMeta.quota_remaining} of {selectedApiKeyMeta.quota_limit} requests remaining today
+              </div>
+            )}
           </div>
 
           <div>
@@ -301,17 +492,95 @@ export function ExtractForm() {
               {ranges.map(r => <option key={`${r.start}-${r.end}`} value={`${r.start}-${r.end}`}>{r.label}</option>)}
             </select>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', marginTop: 6 }}>{totalPages > 0 ? `Detected ${totalPages} pages` : 'Upload a PDF to detect pages'}</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,.25)', marginTop: 2 }}>~{estimatedApiCalls} API calls · 5 pages/batch</div>
+          </div>
+
+          <div>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: 1 }}>RECENT FILES</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)' }}>{recent.length} extractions</div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              {recent.length === 0 ? (
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,.24)' }}>No recent extraction runs</div>
+              ) : (
+                recent.slice(0, 4).map(r => (
+                  <div key={r.id} style={{ border: '1px solid rgba(255,255,255,.06)', borderRadius: 8, background: 'rgba(255,255,255,.02)', padding: '8px 9px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,.45)', fontFamily: "'DM Mono', monospace" }}>PDF</span>
+                      <span style={{ fontSize: 10, color: r.status === 'completed' ? '#86efac' : '#fca5a5' }}>{r.status === 'completed' ? 'done' : 'failed'}</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,.65)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</div>
+                    <div style={{ marginTop: 3, fontSize: 10, color: 'rgba(255,255,255,.3)' }}>
+                      {r.status === 'completed' ? `${r.courses} courses · ${relTime(r.ts)}` : relTime(r.ts)}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
 
           <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
             <button onClick={handleExtract} disabled={status === 'extracting'} style={{ padding: '12px 0', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #603AC8, #31225C)', color: '#fff', fontWeight: 700, cursor: status === 'extracting' ? 'not-allowed' : 'pointer', opacity: status === 'extracting' ? 0.6 : 1 }}>
-              {status === 'extracting' ? `Extracting… ${elapsed}s` : '⚡ Extract Courses'}
+              {status === 'extracting' ? `Extracting ${selectedRangeLabel}… ${elapsed}s` : `⚡ Extract ${selectedRangeLabel}`}
             </button>
+            {selectedRange !== 'all' && (
+              <div style={{ fontSize: 11, color: '#fcd34d', background: 'rgba(120,53,15,.25)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 8, padding: '8px 10px' }}>
+                Only {selectedRangeLabel} will be processed. Choose “All pages” to extract the full PDF.
+              </div>
+            )}
             {error && <div style={{ fontSize: 12, color: '#fca5a5', background: 'rgba(127,29,29,.35)', border: '1px solid rgba(248,113,113,.35)', borderRadius: 8, padding: '8px 10px' }}>{error}</div>}
           </div>
         </div>
 
         <div className='panel' style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 20, gap: 16, overflow: 'hidden' }}>
+          <div className='extract-actions' style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+            {filteredCourses.length > 0 && (
+              <div style={{ textAlign: 'right' }}>
+                <div
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 700,
+                    color: '#a78bfa',
+                    fontFamily: "'DM Mono',monospace",
+                    lineHeight: 1,
+                  }}
+                >
+                  {filteredCourses.length}
+                </div>
+                <div
+                  style={{
+                    fontSize: 9,
+                    color: 'rgba(255,255,255,0.35)',
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  COURSES
+                </div>
+              </div>
+            )}
+            {courses.length > 0 && (
+              <button
+                onClick={clearAllData}
+                title='Clear all data'
+                style={{
+                  padding: '6px 10px',
+                  borderRadius: 7,
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  background: 'rgba(255,255,255,0.03)',
+                  color: 'rgba(255,255,255,0.4)',
+                  fontSize: 11,
+                  cursor: 'pointer',
+                  fontFamily: "'DM Sans', sans-serif",
+                  transition: 'all 0.2s',
+                  fontWeight: 500,
+                }}
+              >
+                🗑️ Clear
+              </button>
+            )}
+          </div>
+
           <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,.07)', background: '#1a1229', padding: '16px 20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', fontWeight: 600 }}>{status === 'extracting' ? 'EXTRACTION IN PROGRESS' : 'EXTRACTION OUTPUT'}</div>
@@ -322,13 +591,31 @@ export function ExtractForm() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, background: 'rgba(255,255,255,.05)', padding: '8px 12px', maxWidth: 340, width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, background: 'rgba(255,255,255,.05)', padding: '8px 12px', flex: 1, maxWidth: 340 }}>
               <span style={{ opacity: 0.6 }}>🔍</span>
               <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder='Search courses, codes, categories…' style={{ border: 'none', outline: 'none', width: '100%', background: 'none', color: '#e2e0ea' }} />
             </div>
-            <div className='hide-sm' style={{ fontSize: 12, color: 'rgba(255,255,255,.3)', fontFamily: "'DM Mono', monospace" }}>{filteredCourses.length} shown</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {courses.length > 0 && (
+                <>
+                  <button onClick={saveToDatabase} disabled={saveStatus === 'saving'} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid rgba(96,58,200,0.3)', background: saveStatus === 'saved' ? 'rgba(34,197,94,0.15)' : 'rgba(96,58,200,0.1)', color: saveStatus === 'saved' ? '#4ade80' : '#a78bfa', fontSize: 12, fontWeight: 600, cursor: saveStatus === 'saving' ? 'not-allowed' : 'pointer', transition: 'all 0.2s', fontFamily: "'DM Sans', sans-serif" }}>
+                    {saveStatus === 'saving' ? '💾 Saving...' : saveStatus === 'saved' ? '✓ Saved' : '💾 Save to DB'}
+                  </button>
+                  <button onClick={exportToCSV} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.65)', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', fontFamily: "'DM Sans', sans-serif" }}>
+                    📊 Export CSV
+                  </button>
+                </>
+              )}
+              <div className='hide-sm' style={{ fontSize: 12, color: 'rgba(255,255,255,.3)', fontFamily: "'DM Mono', monospace" }}>{filteredCourses.length} shown</div>
+            </div>
           </div>
+
+          {saveMessage && (
+            <div style={{ fontSize: 12, padding: '8px 12px', borderRadius: 8, background: saveStatus === 'error' ? 'rgba(239,68,68,0.15)' : saveStatus === 'saved' ? 'rgba(34,197,94,0.15)' : 'rgba(96,58,200,0.1)', border: `1px solid ${saveStatus === 'error' ? 'rgba(239,68,68,0.3)' : saveStatus === 'saved' ? 'rgba(34,197,94,0.3)' : 'rgba(96,58,200,0.3)'}`, color: saveStatus === 'error' ? '#fca5a5' : saveStatus === 'saved' ? '#4ade80' : '#a78bfa' }}>
+              {saveMessage}
+            </div>
+          )}
 
           <div style={{ flex: 1, overflow: 'auto', border: '1px solid rgba(255,255,255,.07)', borderRadius: 12 }}>
             {filteredCourses.length === 0 ? (
@@ -344,7 +631,7 @@ export function ExtractForm() {
                 </thead>
                 <tbody>
                   {filteredCourses.map((course, index) => (
-                    <tr key={course.id} style={{ borderBottom: '1px solid rgba(255,255,255,.03)' }}>
+                    <tr key={`${course.code}-${course.name}-${index}`} style={{ borderBottom: '1px solid rgba(255,255,255,.03)' }}>
                       <td style={{ padding: '9px 14px', color: 'rgba(255,255,255,.22)', fontFamily: "'DM Mono', monospace" }}>{index + 1}</td>
                       <td style={{ padding: '9px 14px' }}>
                         <span style={{ display: 'inline-flex', padding: '2px 8px', borderRadius: 4, fontSize: 11, background: `${(COLORS[course.category] || '#6b7280')}22`, border: `1px solid ${(COLORS[course.category] || '#6b7280')}44`, color: COLORS[course.category] || '#6b7280' }}>{course.category}</span>
