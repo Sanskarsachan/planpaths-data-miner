@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
+import { CheckCircle, AlertCircle, ClipboardList, Loader2, Search } from 'lucide-react'
 
 interface DiagnosticsData {
   timestamp: string
@@ -58,13 +58,16 @@ export default function DiagnosticsPage() {
     )
   }
 
-  const isConnected = diagnostics.database_connection?.startsWith('✅')
+  const isConnected = diagnostics.database_connection?.startsWith('OK:')
   const isIncomplete = diagnostics.supabase_service_role_key?.includes('incomplete')
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6 space-y-6">
       <div className="bg-white rounded-lg shadow p-6">
-        <h1 className="text-3xl font-bold mb-2">🔍 Supabase Diagnostics</h1>
+        <h1 className="text-3xl font-bold mb-2 inline-flex items-center gap-2">
+          <Search className="h-8 w-8" />
+          Supabase Diagnostics
+        </h1>
         <p className="text-gray-600">Checking your database connection and configuration...</p>
       </div>
 
@@ -81,7 +84,7 @@ export default function DiagnosticsPage() {
             <AlertCircle className="h-6 w-6 text-red-600" />
           )}
           <h2 className="text-2xl font-bold">
-            {isConnected ? '✅ Connected to Supabase' : '❌ Connection Issues'}
+            {isConnected ? 'Connected to Supabase' : 'Connection Issues'}
           </h2>
         </div>
         <p className={isConnected ? 'text-green-700' : 'text-red-700'}>
@@ -91,14 +94,17 @@ export default function DiagnosticsPage() {
 
       {/* Environment Variables */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-xl font-bold mb-4">📋 Environment Configuration</h2>
+        <h2 className="text-xl font-bold mb-4 inline-flex items-center gap-2">
+          <ClipboardList className="h-5 w-5" />
+          Environment Configuration
+        </h2>
         <div className="space-y-3">
           <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
             <div>
               <p className="font-semibold">NEXT_PUBLIC_SUPABASE_URL</p>
               <p className="text-sm text-gray-600">Supabase Project URL</p>
             </div>
-            <span className={diagnostics.supabase_url.includes('✅') ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
+            <span className={diagnostics.supabase_url.includes('OK:') ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
               {diagnostics.supabase_url}
             </span>
           </div>
@@ -108,7 +114,7 @@ export default function DiagnosticsPage() {
               <p className="font-semibold">NEXT_PUBLIC_SUPABASE_ANON_KEY</p>
               <p className="text-sm text-gray-600">Anonymous API key for browser</p>
             </div>
-            <span className={diagnostics.supabase_anon_key.includes('✅') ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
+            <span className={diagnostics.supabase_anon_key.includes('OK:') ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
               {diagnostics.supabase_anon_key}
             </span>
           </div>
@@ -120,12 +126,13 @@ export default function DiagnosticsPage() {
               <p className="font-semibold">SUPABASE_SERVICE_ROLE_KEY</p>
               <p className="text-sm text-gray-600">Server-side secret key (backend only)</p>
               {isIncomplete && (
-                <p className="text-sm text-red-700 font-bold mt-1">
-                  ⚠️ INCOMPLETE - Ends with ... instead of full key
+                <p className="text-sm text-red-700 font-bold mt-1 inline-flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4" />
+                  INCOMPLETE - Ends with ... instead of full key
                 </p>
               )}
             </div>
-            <span className={isIncomplete ? 'text-red-600 font-bold' : diagnostics.supabase_service_role_key.includes('✅') ? 'text-green-600 font-bold' : 'text-yellow-600 font-bold'}>
+            <span className={isIncomplete ? 'text-red-600 font-bold' : diagnostics.supabase_service_role_key.includes('OK:') ? 'text-green-600 font-bold' : 'text-yellow-600 font-bold'}>
               {diagnostics.supabase_service_role_key}
             </span>
           </div>
@@ -135,7 +142,7 @@ export default function DiagnosticsPage() {
               <p className="font-semibold">GEMINI_API_KEY</p>
               <p className="text-sm text-gray-600">Google Gemini API key</p>
             </div>
-            <span className={diagnostics.gemini_api_key.includes('✅') ? 'text-green-600 font-bold' : 'text-yellow-600 font-bold'}>
+            <span className={diagnostics.gemini_api_key.includes('OK:') ? 'text-green-600 font-bold' : 'text-yellow-600 font-bold'}>
               {diagnostics.gemini_api_key}
             </span>
           </div>
@@ -145,7 +152,7 @@ export default function DiagnosticsPage() {
       {/* Database Connection Details */}
       {diagnostics.database_error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <h2 className="text-lg font-bold text-red-800 mb-3">❌ Database Error</h2>
+          <h2 className="text-lg font-bold text-red-800 mb-3">Database Error</h2>
           <pre className="bg-white p-3 rounded border border-red-300 overflow-auto text-sm">
             {JSON.stringify(diagnostics.database_error, null, 2)}
           </pre>
@@ -155,7 +162,7 @@ export default function DiagnosticsPage() {
       {/* API Keys Found */}
       {diagnostics.api_keys && diagnostics.api_keys.length > 0 && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-          <h2 className="text-lg font-bold text-green-800 mb-3">✅ API Keys Found ({diagnostics.api_keys.length})</h2>
+          <h2 className="text-lg font-bold text-green-800 mb-3">API Keys Found ({diagnostics.api_keys.length})</h2>
           <div className="space-y-2">
             {diagnostics.api_keys.map((key: any, idx: number) => (
               <div key={idx} className="bg-white p-3 rounded border border-green-300">
@@ -172,7 +179,7 @@ export default function DiagnosticsPage() {
       {/* Fix Instructions */}
       {isIncomplete && (
         <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-6">
-          <h2 className="text-xl font-bold text-yellow-900 mb-3">🔧 How to Fix</h2>
+          <h2 className="text-xl font-bold text-yellow-900 mb-3">How to Fix</h2>
           <ol className="space-y-3 text-yellow-900">
             <li className="flex gap-3">
               <span className="font-bold">1.</span>

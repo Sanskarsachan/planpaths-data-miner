@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { BookOpen, MessageSquare, Pickaxe, Zap } from 'lucide-react'
 
 export function Header() {
   const router = useRouter()
@@ -78,11 +79,10 @@ export function Header() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: 15,
             flexShrink: 0,
           }}
         >
-          📚
+          <BookOpen size={15} color='#ffffff' strokeWidth={2.2} />
         </div>
         <div>
           <div
@@ -126,11 +126,12 @@ export function Header() {
         }}
       >
         {[
-          { id: 'ask', label: 'Ask', icon: '💬', desc: 'Query your data', path: '/ask' },
-          { id: 'extract', label: 'Extract', icon: '⚡', desc: 'Harvest courses from PDFs', path: '/extract' },
-          { id: 'mine', label: 'Mine', icon: '⛏', desc: 'Analyze & map courses', path: '/mine' },
+          { id: 'ask', label: 'Ask', icon: MessageSquare, desc: 'Query your data', path: '/ask' },
+          { id: 'extract', label: 'Extract', icon: Zap, desc: 'Harvest courses from PDFs', path: '/extract' },
+          { id: 'mine', label: 'Mine', icon: Pickaxe, desc: 'Analyze & map courses', path: '/mine' },
         ].map(tab => {
           const isActive = pathname === tab.path
+          const TabIcon = tab.icon
           return (
             <button
               key={tab.id}
@@ -156,7 +157,9 @@ export function Header() {
                 flexShrink: 0,
               }}
             >
-              <span style={{ fontSize: 13, lineHeight: 1 }}>{tab.icon}</span>
+              <span style={{ display: 'flex', alignItems: 'center', lineHeight: 1 }}>
+                <TabIcon size={13} strokeWidth={2.2} />
+              </span>
               <span>{tab.label}</span>
               {isActive && (
                 <span

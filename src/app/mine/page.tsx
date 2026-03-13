@@ -3,6 +3,22 @@
 import { useState, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { FloridaDBSection } from '@/components/FloridaDBSection';
+import {
+  AlertTriangle,
+  BarChart3,
+  BookOpen,
+  CheckCircle2,
+  Database,
+  FolderKanban,
+  Link2,
+  Network,
+  School,
+  Send,
+  Table2,
+  X,
+  Search,
+  Type,
+} from 'lucide-react';
 
 // ─── DATA TYPES ─────────────────────────────────────────────────────────────
 interface School {
@@ -279,12 +295,12 @@ function MineSection() {
   }, [mineSection, mappingLoaded, mappingLoading]);
 
   const nav = [
-    { id: 'overview', icon: '📊', label: 'Overview' },
-    { id: 'schools', icon: '🏫', label: 'Schools' },
-    { id: 'florida', icon: '🗂', label: 'Florida DB' },
-    { id: 'mapping', icon: '🔗', label: 'Mapping' },
-    { id: 'entity', icon: '📐', label: 'Entity Diagram' },
-    { id: 'schema', icon: '🗄', label: 'Table Schema' },
+    { id: 'overview', icon: BarChart3, label: 'Overview' },
+    { id: 'schools', icon: School, label: 'Schools' },
+    { id: 'florida', icon: FolderKanban, label: 'Florida DB' },
+    { id: 'mapping', icon: Link2, label: 'Mapping' },
+    { id: 'entity', icon: Network, label: 'Entity Diagram' },
+    { id: 'schema', icon: Table2, label: 'Table Schema' },
   ];
 
   const totalCourses = schools.reduce((a, s) => a + s.courses, 0);
@@ -376,6 +392,7 @@ function MineSection() {
         </div>
         {nav.map(n => {
           const isActive = mineSection === n.id;
+          const NavIcon = n.icon;
           return (
             <button
               key={n.id}
@@ -398,7 +415,9 @@ function MineSection() {
                 transition: 'all 0.15s',
               }}
             >
-              <span style={{ fontSize: 14 }}>{n.icon}</span>
+              <span style={{ display: 'flex', alignItems: 'center' }}>
+                <NavIcon size={14} strokeWidth={2.2} />
+              </span>
               {n.label}
             </button>
           );
@@ -557,22 +576,22 @@ function OverviewSection({
             value: schools.length,
             sub: 'in database',
             color: '#603AC8',
-            icon: '🏫',
+            icon: School,
           },
-          { label: 'Total Courses', value: totalCourses, sub: 'extracted', color: '#0891b2', icon: '📚' },
+          { label: 'Total Courses', value: totalCourses, sub: 'extracted', color: '#0891b2', icon: BookOpen },
           {
             label: 'Mapped',
             value: `${mapPct}%`,
             sub: `${totalMapped} matched`,
             color: '#059669',
-            icon: '✅',
+            icon: CheckCircle2,
           },
           {
             label: 'Unmatched',
             value: totalUnmatched,
             sub: 'need review',
             color: '#f87171',
-            icon: '⚠️',
+            icon: AlertTriangle,
           },
         ].map(s => (
           <div
@@ -585,7 +604,9 @@ function OverviewSection({
               borderTop: `2px solid ${s.color}`,
             }}
           >
-            <div style={{ fontSize: 22, marginBottom: 6 }}>{s.icon}</div>
+            <div style={{ marginBottom: 6, display: 'flex', alignItems: 'center' }}>
+              <s.icon size={22} color={s.color} strokeWidth={2.1} />
+            </div>
             <div
               style={{
                 fontSize: 28,
@@ -999,14 +1020,14 @@ function SchoolsSection({
             </div>
             <button
               onClick={() => onSchoolSelect(null)}
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 7, color: 'rgba(255,255,255,0.5)', padding: '5px 10px', fontSize: 11, cursor: 'pointer' }}
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 7, color: 'rgba(255,255,255,0.5)', padding: '5px 10px', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
             >
-              ✕ Close
+              <X size={12} strokeWidth={2.2} /> Close
             </button>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, background: 'rgba(255,255,255,0.04)', padding: '7px 12px', flexShrink: 0 }}>
-            <span style={{ opacity: 0.5, fontSize: 12 }}>🔍</span>
+            <Search size={12} color='rgba(255,255,255,0.5)' strokeWidth={2.2} />
             <input
               value={courseSearch}
               onChange={e => setCourseSearch(e.target.value)}
@@ -1529,20 +1550,21 @@ function SchemaSection({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 20,
                 }}
               >
-                {table.name === 'schools'
-                  ? '🏫'
-                  : table.name === 'uploads'
-                    ? '📤'
-                    : table.name === 'extractions_v2'
-                      ? '📋'
-                      : table.name === 'master_courses'
-                        ? '🗂'
-                        : table.name === 'mapping_results'
-                          ? '🔗'
-                          : '🔤'}
+                {table.name === 'schools' ? (
+                  <School size={20} color={table.color} strokeWidth={2.2} />
+                ) : table.name === 'uploads' ? (
+                  <Send size={20} color={table.color} strokeWidth={2.2} />
+                ) : table.name === 'extractions_v2' ? (
+                  <Database size={20} color={table.color} strokeWidth={2.2} />
+                ) : table.name === 'master_courses' ? (
+                  <FolderKanban size={20} color={table.color} strokeWidth={2.2} />
+                ) : table.name === 'mapping_results' ? (
+                  <Link2 size={20} color={table.color} strokeWidth={2.2} />
+                ) : (
+                  <Type size={20} color={table.color} strokeWidth={2.2} />
+                )}
               </div>
               <div style={{ flex: 1 }}>
                 <div

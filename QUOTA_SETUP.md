@@ -43,7 +43,7 @@ VALUES
   ('Key #19', 'AIzaSyZ...', true, false);
 ```
 
-⚠️ **Security:** Consider encrypting keys at rest in Supabase. For now they're stored plaintext.
+ **Security:** Consider encrypting keys at rest in Supabase. For now they're stored plaintext.
 
 ### Phase 2: Environment Setup
 
@@ -214,11 +214,11 @@ pnpm test
 ```
 
 Tests cover:
-- ✅ Quota availability checks
-- ✅ Key selection logic
-- ✅ Usage logging
-- ✅ Daily reset behavior
-- ✅ Error handling
+- Quota availability checks
+- Key selection logic
+- Usage logging
+- Daily reset behavior
+- Error handling
 
 #### 5.2 Integration Tests
 
@@ -409,14 +409,14 @@ Everything still works with `GEMINI_API_KEY` environment variable.
 
 ### Success Criteria
 
-✅ All 19 keys registered in `api_keys` table  
-✅ Zero requests proceed without quota check  
-✅ Quota decrements correctly (20 total per day)  
-✅ Daily reset at 00:00 UTC succeeds  
-✅ Usage tracked with >99% accuracy  
-✅ Dashboard shows real-time status  
-✅ 429 errors handled gracefully  
-✅ No existing functionality broken  
+ All 19 keys registered in `api_keys` table  
+ Zero requests proceed without quota check  
+ Quota decrements correctly (20 total per day)  
+ Daily reset at 00:00 UTC succeeds  
+ Usage tracked with >99% accuracy  
+ Dashboard shows real-time status  
+ 429 errors handled gracefully  
+ No existing functionality broken  
 
 ---
 

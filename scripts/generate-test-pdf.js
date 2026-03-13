@@ -107,7 +107,7 @@ ${Buffer.from(pdfContent).length}
   // For simplicity, create a text file that represents a PDF-like content
   // In production, use pdf-lib or similar
   fs.writeFileSync(filename, catalogText, 'utf-8')
-  console.log(`✓ Test PDF created: ${filename}`)
+  console.log(`Test PDF created: ${filename}`)
 }
 
 generateTestPDF()

@@ -44,7 +44,7 @@ export async function GET() {
       })
     }
 
-    console.log(`✅ Successfully fetched ${data?.length || 0} API keys`)
+    console.log(`Successfully fetched ${data?.length || 0} API keys`)
 
     const keys = (data || []).map(key => ({
       id: key.id,

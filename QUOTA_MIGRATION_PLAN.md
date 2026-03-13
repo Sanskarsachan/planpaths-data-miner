@@ -7,16 +7,16 @@
 
 ---
 
-## 📋 Current State Analysis
+## Current State Analysis
 
 ### What You Have Now
-- ✅ **Supabase** already integrated (PostgreSQL backend)
-- ✅ **7 API routes** (extract, map, master-db import, schools, synonyms)
-- ✅ **GeminiExtractor** handles Gemini API calls
-- ✅ **Single GEMINI_API_KEY** from environment variables
-- ❌ **No API key pooling** - only one key
-- ❌ **No quota tracking** - unlimited (until hit actual Gemini limits)
-- ❌ **No quota enforcement** - no checks before API calls
+- **Supabase** already integrated (PostgreSQL backend)
+- **7 API routes** (extract, map, master-db import, schools, synonyms)
+- **GeminiExtractor** handles Gemini API calls
+- **Single GEMINI_API_KEY** from environment variables
+- **No API key pooling** - only one key
+- **No quota tracking** - unlimited (until hit actual Gemini limits)
+- **No quota enforcement** - no checks before API calls
 
 ### Database Schema (Current)
 ```
@@ -45,7 +45,7 @@ Returns courses → Save to Supabase
 
 ---
 
-## 🎯 Target Architecture
+## Target Architecture
 
 ### New Design: Shared Quota Pool (20 requests/day total)
 ```
@@ -77,15 +77,15 @@ GeminiExtractor.extractAllChunks(apiKeyId)
     ↓
 model.generateContent(prompt)  ← Uses pool API key
     ↓
-✓ Success → logApiUsage() → Increment counter
-✗ Failed  → logApiUsage(error=true) → Track error
+ Success → logApiUsage() → Increment counter
+ Failed  → logApiUsage(error=true) → Track error
     ↓
 Return courses → Save to Supabase
 ```
 
 ---
 
-## 🏗️ Implementation Phases
+## Implementation Phases
 
 ### Phase 1: Database Schema (2 hours)
 Create Supabase migration with new tables:
@@ -351,7 +351,7 @@ POST /api/v2/admin/reset-quotas
 
 ---
 
-## 📊 Data Flows
+## Data Flows
 
 ### Scenario 1: Normal Extraction
 ```
@@ -387,9 +387,9 @@ POST /api/v2/admin/reset-quotas
 
 ---
 
-## 🔧 Integration Checklist
+## Integration Checklist
 
-### ✅ Database Layer
+### Database Layer
 - [ ] Create `api_keys` table (19 key records)
 - [ ] Create `api_usage_logs` table (audit trail)
 - [ ] Create `api_quota_resets` table (reset history)
@@ -397,13 +397,13 @@ POST /api/v2/admin/reset-quotas
 - [ ] Create migration file in `/supabase/migrations/005_quota_system.sql`
 - [ ] Run migration: `pnpm run db:push`
 
-### ✅ Backend Services
+### Backend Services
 - [ ] Create `lib/quota/QuotaManager.ts` (core logic)
 - [ ] Create `lib/quota/supabase-quota.ts` (DB queries)
 - [ ] Update `lib/extraction/GeminiExtractor.ts` (accept apiKeyId)
 - [ ] Create `lib/quota/useQuota.ts` hook for components
 
-### ✅ API Routes
+### API Routes
 - [ ] Update `src/app/api/extract/route.ts`
 - [ ] Update `src/app/api/map/route.ts`
 - [ ] Update `src/app/api/master-db/import/route.ts`
@@ -413,26 +413,26 @@ POST /api/v2/admin/reset-quotas
 - [ ] Create `src/app/api/v2/admin/reset-quotas.ts`
 - [ ] Create `src/app/api/cron/reset-quotas.ts`
 
-### ✅ Frontend
+### Frontend
 - [ ] Create `src/components/QuotaStatus.tsx`
 - [ ] Create `src/components/QuotaDashboard.tsx`
 - [ ] Update `src/app/extract/page.tsx`
 - [ ] Update `src/app/mapping/page.tsx`
 
-### ✅ Configuration
+### Configuration
 - [ ] Add `CRON_SECRET` to `.env.local`
 - [ ] Update `.env.local.example` with quota docs
 - [ ] Update `vercel.json` with cron job config
 - [ ] Document Supabase backups
 
-### ✅ Testing
+### Testing
 - [ ] Write tests for `QuotaManager.ts`
 - [ ] Test quota enforcement before API calls
 - [ ] Test daily reset logic
 - [ ] Test error scenarios (no keys available, etc.)
 - [ ] Load test with simulated 20 requests/day
 
-### ✅ Deployment
+### Deployment
 - [ ] Run migration on production Supabase
 - [ ] Add 19 API keys to production `api_keys` table
 - [ ] Deploy API routes with quota checks
@@ -442,12 +442,12 @@ POST /api/v2/admin/reset-quotas
 
 ---
 
-## ⚠️ Important Notes
+## Important Notes
 
 ### Quota Enforcement
-- ✅ Checked **at the start** of each extraction
-- ✅ Checked for **all 7 API routes**
-- ✅ Shared pool means **if one endpoint uses quota, all others see reduced quota**
+- Checked **at the start** of each extraction
+- Checked for **all 7 API routes**
+- Shared pool means **if one endpoint uses quota, all others see reduced quota**
 
 ### Key Rotation
 ```typescript
@@ -479,21 +479,21 @@ function estimateTokens(response) {
 
 ---
 
-## 📈 Success Metrics
+## Success Metrics
 
 After implementation:
-- ✅ All 19 API keys registered in `api_keys` table
-- ✅ Zero requests go through without quota check
-- ✅ Daily quota correctly resets at 00:00 UTC
-- ✅ Usage tracked with < 99% accuracy
-- ✅ Dashboard shows real-time quota status
-- ✅ 429 errors properly handled in frontend
-- ✅ No data loss during migration
-- ✅ All existing extractions still work
+- All 19 API keys registered in `api_keys` table
+- Zero requests go through without quota check
+- Daily quota correctly resets at 00:00 UTC
+- Usage tracked with < 99% accuracy
+- Dashboard shows real-time quota status
+- 429 errors properly handled in frontend
+- No data loss during migration
+- All existing extractions still work
 
 ---
 
-## 🎓 Questions for You
+## Questions for You
 
 Before we implement:
 
@@ -501,39 +501,39 @@ Before we implement:
    - Stored in Supabase `api_keys` table encrypted?
    - Only passed via environment variables initially?
    - Both (secrets in env, metadata in DB)?
-   - ✅ **Recommendation:** Encrypt in DB (more flexible for rotation)
+   -  **Recommendation:** Encrypt in DB (more flexible for rotation)
 
 2. **Key Selection Strategy:**
    - Round-robin (cycle through all keys)?
    - Next-available (pick first with quota)?
    - Random (randomize?)?
-   - ✅ **Recommendation:** Next-available (deterministic, fair)
+   -  **Recommendation:** Next-available (deterministic, fair)
 
 3. **Error Retry:**
    - When extraction fails, should we retry with different key?
-   - ✅ **Recommendation:** No (keep simple, user can retry)
+   -  **Recommendation:** No (keep simple, user can retry)
 
 4. **Admin Panel:**
    - Need UI to add/delete/rotate keys?
    - Need analytics dashboard?
-   - ✅ **Recommendation:** Start with basic dashboard
+   -  **Recommendation:** Start with basic dashboard
 
 5. **Timeline:**
    - Full implementation: ~15-20 hours
    - Phased rollout (start with Phase 1-2)?
-   - ✅ **Recommendation:** All phases together (cleaner)
+   -  **Recommendation:** All phases together (cleaner)
 
 ---
 
-## 🚀 Next Steps
+## Next Steps
 
 Once you confirm this plan:
-1. ✅ I'll create the Supabase migration (Phase 1)
-2. ✅ I'll build QuotaManager service (Phase 2)
-3. ✅ I'll update GeminiExtractor (Phase 3)
-4. ✅ I'll update all API routes (Phase 4)
-5. ✅ I'll setup cron job (Phase 5)
-6. ✅ I'll create monitoring endpoints (Phase 6)
-7. ✅ I'll add frontend UI (Phase 7)
+1. I'll create the Supabase migration (Phase 1)
+2. I'll build QuotaManager service (Phase 2)
+3. I'll update GeminiExtractor (Phase 3)
+4. I'll update all API routes (Phase 4)
+5. I'll setup cron job (Phase 5)
+6. I'll create monitoring endpoints (Phase 6)
+7. I'll add frontend UI (Phase 7)
 
-**Ready to proceed?** Just confirm the plan or request any changes! 🎯
+**Ready to proceed?** Just confirm the plan or request any changes! 

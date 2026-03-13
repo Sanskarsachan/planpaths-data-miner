@@ -61,7 +61,7 @@ Comprehensive debugging and logging has been added throughout the extraction pip
 **Progress Updates:**
 ```
 [Extract] Progress: processing | 1/2 | Processing pages 1–5 (chunk 1/2)…
-[Extract] Progress: chunk_complete | 1/2 | ✓ Pages 1–3: 25 courses found
+[Extract] Progress: chunk_complete | 1/2 |  Pages 1–3: 25 courses found
 [Extract] Progress: waiting | 1/2 | Waiting before next batch…
 ```
 
@@ -134,24 +134,24 @@ If extraction fails, check logs in this order:
 
 1. **API Key Selection**
    - `Does QuotaManager say which key was selected?`
-   - ✅ Should see: `Selected key via RPC: {nickname} (ID: {id}) | Remaining: X/20`
+   -  Should see: `Selected key via RPC: {nickname} (ID: {id}) | Remaining: X/20`
 
 2. **First API Call**
    - `Is ChunkProcessor making the call with the selected key?`
-   - ✅ Should see: `→ Gemini API | attempt 1/3 | pages X-Y | keyId={id}`
+   -  Should see: `→ Gemini API | attempt 1/3 | pages X-Y | keyId={id}`
 
 3. **API Error**
    - `What error type is being returned?`
-   - ✅ Should see: `ERROR ({TYPE}) | KeyId={id} | Status: {code}`
+   -  Should see: `ERROR ({TYPE}) | KeyId={id} | Status: {code}`
 
 4. **Retry Behavior**
    - `Does ChunkProcessor retry after errors?`
-   - ✅ Should see: `Retrying ({TYPE}): attempt 1/3...` (up to 3 times)
+   -  Should see: `Retrying ({TYPE}): attempt 1/3...` (up to 3 times)
 
 5. **Final Status**
    - `Does extraction complete or fail?`
-   - ✅ Should see: `Complete | {count} courses | {time}ms`
-   - ❌ Should see: `Fatal error | KeyId={id} | Status: {code}`
+   -  Should see: `Complete | {count} courses | {time}ms`
+   -  Should see: `Fatal error | KeyId={id} | Status: {code}`
 
 ## Common Issues & Solutions
 
@@ -207,9 +207,9 @@ pnpm run dev
 ```
 
 Key patterns to watch for:
-- ✅ `Selected key via RPC: {name} | Remaining: {N}/20`
-- ✅ `← {N} courses | {T} tokens`
-- ✅ `Complete | {N} courses | {time}ms`
+- `Selected key via RPC: {name} | Remaining: {N}/20`
+- `← {N} courses | {T} tokens`
+- `Complete | {N} courses | {time}ms`
 
 ## API Usage Logs
 

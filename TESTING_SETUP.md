@@ -62,12 +62,12 @@ src/
 
 #### `ExtractForm.test.tsx`
 Tests for the PDF extraction form component:
-- ✅ Renders all required form fields
-- ✅ Validates file type (PDF only)
-- ✅ Validates file size (max 50MB)
-- ✅ Enables/disables submit button correctly
-- ✅ Submits form with correct data
-- ✅ Displays error messages on failure
+- Renders all required form fields
+- Validates file type (PDF only)
+- Validates file size (max 50MB)
+- Enables/disables submit button correctly
+- Submits form with correct data
+- Displays error messages on failure
 
 **Run:** `pnpm test ExtractForm.test.tsx`
 
@@ -75,10 +75,10 @@ Tests for the PDF extraction form component:
 
 #### `route.test.ts` (Extract endpoint)
 Tests for POST /api/extract endpoint:
-- ✅ Returns 400 when required fields missing
-- ✅ Processes valid PDF uploads
-- ✅ Returns upload_id and school_slug
-- ✅ Handles server errors gracefully
+- Returns 400 when required fields missing
+- Processes valid PDF uploads
+- Returns upload_id and school_slug
+- Handles server errors gracefully
 
 **Run:** `pnpm test route.test.ts`
 
@@ -86,11 +86,11 @@ Tests for POST /api/extract endpoint:
 
 #### `hashCourse.test.ts`
 Tests for SHA-256 course hashing utility:
-- ✅ Generates consistent hashes
-- ✅ Different inputs produce different hashes
-- ✅ Returns 64-character hex string
-- ✅ Handles special characters
-- ✅ Whitespace sensitivity
+- Generates consistent hashes
+- Different inputs produce different hashes
+- Returns 64-character hex string
+- Handles special characters
+- Whitespace sensitivity
 
 **Run:** `pnpm test hashCourse.test.ts`
 
@@ -98,12 +98,12 @@ Tests for SHA-256 course hashing utility:
 
 #### `StateDetector.test.ts`
 Tests for school state detection:
-- ✅ Detects Florida (FL) from content/filename
-- ✅ Detects Texas (TX)
-- ✅ Detects California (CA)
-- ✅ Falls back to filename detection
-- ✅ Case-insensitive matching
-- ✅ Handles edge cases (empty text, long text)
+- Detects Florida (FL) from content/filename
+- Detects Texas (TX)
+- Detects California (CA)
+- Falls back to filename detection
+- Case-insensitive matching
+- Handles edge cases (empty text, long text)
 
 **Run:** `pnpm test StateDetector.test.ts`
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { AlertTriangle, BookOpen, Check, FileText, MessageSquare, Pickaxe, Zap } from 'lucide-react';
 
 // ─── MOCK DATA ──────────────────────────────────────────────────────────────
 const MOCK_BATCHES = [
@@ -165,7 +166,7 @@ function RecheckBanner({ newCourses, onAccept, onDismiss }: { newCourses: any[],
             padding:"6px 14px", borderRadius:6, border:"none",
             background:"#16a34a", color:"#fff", fontSize:12, fontWeight:600, cursor:"pointer",
           }}>
-            ✓ Accept all {newCourses.length}
+            Accept all {newCourses.length}
           </button>
           <button onClick={onDismiss} style={{
             padding:"6px 14px", borderRadius:6, border:"1px solid #166534",
@@ -356,8 +357,8 @@ export default function CourseExtractor() {
             width:30, height:30, borderRadius:7,
             background:"linear-gradient(135deg, #603AC8, #31225C)",
             display:"flex", alignItems:"center", justifyContent:"center",
-            fontSize:15, flexShrink:0,
-          }}>📚</div>
+            flexShrink:0,
+          }}><BookOpen size={16} /></div>
           <div>
             <div style={{ fontWeight:700, fontSize:14, color:"#fff", letterSpacing:"-0.3px", lineHeight:1.2 }}>
               Planpaths
@@ -376,11 +377,12 @@ export default function CourseExtractor() {
           borderRadius:12, padding:3,
         }}>
           {[
-            { id:"ask",     label:"Ask",     icon:"💬", desc:"Query your data" },
-            { id:"extract", label:"Extract", icon:"⚡", desc:"Harvest courses from PDFs" },
-            { id:"mine",    label:"Mine",    icon:"⛏",  desc:"Analyze & map courses" },
+            { id:"ask",     label:"Ask",     icon: MessageSquare, desc:"Query your data" },
+            { id:"extract", label:"Extract", icon: Zap, desc:"Harvest courses from PDFs" },
+            { id:"mine",    label:"Mine",    icon: Pickaxe,  desc:"Analyze & map courses" },
           ].map((tab) => {
             const isActive = activeTab === tab.id;
+            const TabIcon = tab.icon;
             return (
               <button
                 key={tab.id}
@@ -401,7 +403,7 @@ export default function CourseExtractor() {
                   boxShadow: isActive ? "0 2px 12px rgba(96,58,200,0.4)" : "none",
                 }}
               >
-                <span style={{ fontSize:13, lineHeight:1 }}>{tab.icon}</span>
+                <TabIcon size={13} />
                 <span>{tab.label}</span>
                 {isActive && (
                   <span style={{
@@ -518,8 +520,8 @@ export default function CourseExtractor() {
                   fontSize:13, outline:"none", cursor:"pointer",
                 }}
               >
-                <option value="key-001">✓ Primary Key (17/20)</option>
-                <option value="key-002">✓ Backup Key (20/20)</option>
+                <option value="key-001">Primary Key (17/20)</option>
+                <option value="key-002">Backup Key (20/20)</option>
               </select>
             </div>
             <div style={{
@@ -737,7 +739,7 @@ export default function CourseExtractor() {
                   <div style={{ width:14, height:14, border:"2px solid #fff", borderTopColor:"transparent", borderRadius:"50%", animation:"spin 0.7s linear infinite" }}/>
                   Extracting…
                 </>
-              ) : "⚡ Extract Courses"}
+              ) : <><Zap size={14} /> Extract Courses</>}
             </button>
 
             {(status === STATUS.DONE || status === STATUS.RECHECK_DONE) && (
@@ -885,8 +887,8 @@ export default function CourseExtractor() {
                                 <span style={{ fontSize:9, color:"rgba(255,255,255,0.25)", fontFamily:"'DM Mono',monospace" }}>
                                   {pct}% of total
                                 </span>
-                                <span style={{ fontSize:9, color:"#603AC8", fontFamily:"'DM Mono',monospace", fontWeight:700 }}>
-                                  ✓
+                                <span style={{ color:"#603AC8", display:"inline-flex", alignItems:"center" }}>
+                                  <Check size={11} />
                                 </span>
                               </div>
                             </>
@@ -978,7 +980,7 @@ export default function CourseExtractor() {
           <div ref={tableRef} style={{ flex:1, overflowY:"auto", borderRadius:12, border:"1px solid rgba(255,255,255,0.07)" }}>
             {completedBatches.length === 0 && status === STATUS.IDLE && (
               <div style={{ padding:60, textAlign:"center", color:"rgba(255,255,255,0.2)", fontSize:14 }}>
-                <div style={{ fontSize:40, marginBottom:16 }}>📄</div>
+                <div style={{ marginBottom:16, display:"inline-flex", alignItems:"center", justifyContent:"center" }}><FileText size={40} /></div>
                 Select a file and click Extract to begin
               </div>
             )}
@@ -1068,7 +1070,7 @@ export default function CourseExtractor() {
                               {c.name}
                               {(isNew || isAcc) && (
                                 <span style={{ marginLeft:6, background:"rgba(22,163,74,0.25)", color:"#4ade80", fontSize:9, padding:"1px 6px", borderRadius:3, fontWeight:700, fontFamily:"'DM Mono',monospace" }}>
-                                  {isNew ? "NEW ✦" : "ADDED ✓"}
+                                  {isNew ? 'NEW' : 'ADDED'}
                                 </span>
                               )}
                             </td>
@@ -1121,7 +1123,7 @@ export default function CourseExtractor() {
                               <td style={{ padding:"9px 14px", fontWeight:500, color:"#e2e0ea" }}>
                                 {c.name}
                                 <span style={{ marginLeft:6, background:"rgba(22,163,74,0.25)", color:"#4ade80", fontSize:9, padding:"1px 6px", borderRadius:3, fontWeight:700, fontFamily:"'DM Mono',monospace" }}>
-                                  ADDED ✓
+                                  ADDED
                                 </span>
                               </td>
                               <td style={{ padding:"9px 14px", fontFamily:"'DM Mono',monospace", color:"rgba(255,255,255,0.4)", fontSize:11 }}>{c.code}</td>
@@ -1151,7 +1153,7 @@ export default function CourseExtractor() {
                             <td colSpan={7} style={{ padding:"8px 14px", background:"rgba(22,163,74,0.06)", borderTop:"1px solid rgba(22,163,74,0.2)", borderBottom:"1px solid rgba(22,163,74,0.1)" }}>
                               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                                 <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:"#86efac", fontWeight:700, letterSpacing:0.5 }}>
-                                  ✦ MISSED COURSES FOUND · PENDING REVIEW
+                                  MISSED COURSES FOUND · PENDING REVIEW
                                 </span>
                                 <div style={{ flex:1, height:1, background:"rgba(22,163,74,0.2)" }}/>
                                 <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:"rgba(255,255,255,0.25)" }}>
@@ -1174,7 +1176,7 @@ export default function CourseExtractor() {
                               <td style={{ padding:"9px 14px", fontWeight:500, color:"#e2e0ea" }}>
                                 {c.name}
                                 <span style={{ marginLeft:6, background:"rgba(22,163,74,0.3)", color:"#4ade80", fontSize:9, padding:"1px 6px", borderRadius:3, fontWeight:700, fontFamily:"'DM Mono',monospace" }}>
-                                  NEW ✦
+                                  NEW
                                 </span>
                               </td>
                               <td style={{ padding:"9px 14px", fontFamily:"'DM Mono',monospace", color:"rgba(255,255,255,0.4)", fontSize:11 }}>{c.code}</td>
@@ -1223,9 +1225,8 @@ function AskPlaceholder() {
         width:72, height:72, borderRadius:"50%",
         background:"linear-gradient(135deg, #603AC8 0%, #31225C 100%)",
         display:"flex", alignItems:"center", justifyContent:"center",
-        fontSize:32,
         boxShadow:"0 0 0 12px rgba(96,58,200,0.1), 0 0 0 28px rgba(96,58,200,0.05)",
-      }}>💬</div>
+      }}><MessageSquare size={30} /></div>
 
       <div style={{ textAlign:"center", maxWidth:480 }}>
         <div style={{ fontSize:24, fontWeight:700, color:"#fff", marginBottom:10, letterSpacing:"-0.5px" }}>
@@ -1245,7 +1246,7 @@ function AskPlaceholder() {
         display:"flex", alignItems:"center", gap:10,
         opacity:0.5, cursor:"not-allowed",
       }}>
-        <span style={{ fontSize:16 }}>💬</span>
+        <MessageSquare size={16} />
         <span style={{ fontSize:14, color:"rgba(255,255,255,0.25)", fontStyle:"italic" }}>
           Ask a question about your course data…
         </span>
@@ -1280,7 +1281,7 @@ function AskPlaceholder() {
         background:"rgba(251,191,36,0.08)", border:"1px solid rgba(251,191,36,0.2)",
         fontSize:12, color:"#fbbf24",
       }}>
-        <span>🚧</span> This module is under development — extract data first
+        <AlertTriangle size={14} /> This module is under development - extract data first
       </div>
     </div>
   );
@@ -1299,9 +1300,8 @@ function MinePlaceholder() {
         width:72, height:72, borderRadius:"50%",
         background:"linear-gradient(135deg, #603AC8 0%, #31225C 100%)",
         display:"flex", alignItems:"center", justifyContent:"center",
-        fontSize:32,
         boxShadow:"0 0 0 12px rgba(96,58,200,0.1), 0 0 0 28px rgba(96,58,200,0.05)",
-      }}>⛏</div>
+      }}><Pickaxe size={30} /></div>
 
       <div style={{ textAlign:"center", maxWidth:480 }}>
         <div style={{ fontSize:24, fontWeight:700, color:"#fff", marginBottom:10, letterSpacing:"-0.5px" }}>
@@ -1318,7 +1318,7 @@ function MinePlaceholder() {
         background:"rgba(251,191,36,0.08)", border:"1px solid rgba(251,191,36,0.2)",
         fontSize:12, color:"#fbbf24",
       }}>
-        <span>🚧</span> This module is under development
+        <AlertTriangle size={14} /> This module is under development
       </div>
     </div>
   );

@@ -108,7 +108,7 @@ await quotaMgr.recordKeyError(apiKeyId, errorMessage, 403);
 ```
 [Extract] POST: Initiating extraction request
 [Extract] POST: Created job abc123de-5678-9012-3456 for armwood-high-school-fl
-ℹ️ [QuotaManager] Selected key via RPC: My-API-Key-1 (ID: abc123cd...) | Remaining: 19/20
+ℹ [QuotaManager] Selected key via RPC: My-API-Key-1 (ID: abc123cd...) | Remaining: 19/20
 ```
 
 #### b) Error Recording
@@ -133,34 +133,34 @@ await quotaMgr.recordKeyError(apiKeyId, errorMessage, 403);
 ### Issue 1: Leaked API Keys
 **Before:** Silently fails with 403, no indication of why
 **After:** 
-- ✅ Detects "leaked_key" error type
-- ✅ Logs: `[KeyError] Type: leaked_key | Code: 403`
-- ✅ Automatically deactivates the key
-- ✅ Next extraction uses a different key
+- Detects "leaked_key" error type
+- Logs: `[KeyError] Type: leaked_key | Code: 403`
+- Automatically deactivates the key
+- Next extraction uses a different key
 
 ### Issue 2: Quota Exceeded
 **Before:** Hits 429 error, no indication that quota is exhausted
 **After:**
-- ✅ Detects "quota_exceeded" error type
-- ✅ Logs: `[KeyError] Type: quota_exceeded | Code: 429`
-- ✅ Shows in `api_usage_logs` table for metrics
-- ✅ UI tells user to wait for quota reset
+- Detects "quota_exceeded" error type
+- Logs: `[KeyError] Type: quota_exceeded | Code: 429`
+- Shows in `api_usage_logs` table for metrics
+- UI tells user to wait for quota reset
 
 ### Issue 3: Silent Failures (Timeouts)
 **Before:** Timeout happens, all retries fail silently, shows "0 courses"
 **After:**
-- ✅ Logs each timeout: `Timeout after 55000ms`
-- ✅ Shows which API key timed out
-- ✅ Logs all retry attempts
-- ✅ Shows error when retries exhausted: `All retries exhausted for pages 1-5`
+- Logs each timeout: `Timeout after 55000ms`
+- Shows which API key timed out
+- Logs all retry attempts
+- Shows error when retries exhausted: `All retries exhausted for pages 1-5`
 
 ### Issue 4: Unclear Error Messages
 **Before:** `Error: [GoogleGenerativeAI Error]: Error fetching...`
 **After:**
-- ✅ Error type identified: `ERROR (LEAKED_KEY | QUOTA_EXCEEDED | TIMEOUT | INVALID_KEY)`
-- ✅ Status code shown: `Status: 403 | 429 | 401 | N/A`
-- ✅ API key ID logged: `KeyId: abc123cd...`
-- ✅ Context (page range) shown: `Pages: 1-5`
+- Error type identified: `ERROR (LEAKED_KEY | QUOTA_EXCEEDED | TIMEOUT | INVALID_KEY)`
+- Status code shown: `Status: 403 | 429 | 401 | N/A`
+- API key ID logged: `KeyId: abc123cd...`
+- Context (page range) shown: `Pages: 1-5`
 
 ---
 
@@ -168,12 +168,12 @@ await quotaMgr.recordKeyError(apiKeyId, errorMessage, 403);
 
 ### Quick Scan: Is Extraction Working?
 ```
-✅ GOOD:
+ GOOD:
 [QuotaManager] Selected key via RPC: ... | Remaining: 19/20
 [ChunkProcessor] ← 25 courses | 9715 tokens
 [Extract] Complete | 51 courses | 120000ms
 
-❌ BAD:
+ BAD:
 [ChunkProcessor] ERROR (QUOTA_EXCEEDED) | ... | Status: 429
 [ChunkProcessor] All retries exhausted for pages 1-5
 [Extract] Fatal error | KeyId: abc... | Status: 403
@@ -225,7 +225,7 @@ Tests:       15 passed, 15 total
 
 Dev server starts without errors:
 ```
-✓ Ready in 2.5s
+ Ready in 2.5s
 Using port 3001
 ```
 
@@ -234,11 +234,11 @@ Using port 3001
 ## Next Steps
 
 Your system now has:
-1. ✅ Better visibility into API key selection
-2. ✅ Error type detection (leaked, quota, timeout, invalid)
-3. ✅ Automatic key deactivation for leaked keys
-4. ✅ Detailed retry logging
-5. ✅ API error metadata in logs and database
+1. Better visibility into API key selection
+2. Error type detection (leaked, quota, timeout, invalid)
+3. Automatic key deactivation for leaked keys
+4. Detailed retry logging
+5. API error metadata in logs and database
 
 **Try an extraction now and watch the logs!**
 
@@ -250,7 +250,7 @@ Example successful extraction log flow:
 [Extract] Scope: selected range 1-5 (24 total pages)
 [ChunkProcessor] → Gemini API | attempt 1/3 | pages 1-5 | 17282 chars | keyId=abc123cd...
 [ChunkProcessor] ← 25 courses | 9715 tokens
-[Extract] Progress: chunk_complete | 1/1 | ✓ Pages 1–5: 25 courses found
+[Extract] Progress: chunk_complete | 1/1 |  Pages 1–5: 25 courses found
 [Extract] Complete | 25 courses | 45000ms | tokens: 9715
 ```
 

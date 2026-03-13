@@ -1,3 +1,5 @@
+import { Circle } from 'lucide-react'
+
 export default function Home() {
   return (
     <div className="space-y-8">
@@ -48,15 +50,24 @@ export default function Home() {
         <h2 className="text-xl font-bold mb-4">States Supported</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
           <div className="border rounded p-3">
-            <p className="font-semibold">🔵 Florida (FL)</p>
+            <p className="font-semibold inline-flex items-center gap-2">
+              <Circle className="h-3.5 w-3.5 fill-blue-500 text-blue-500" />
+              Florida (FL)
+            </p>
             <p className="text-gray-600 text-xs mt-1">Complete 27-pass engine · 6/7-digit codes · M/J honors</p>
           </div>
           <div className="border rounded p-3 opacity-60">
-            <p className="font-semibold">🟡 Texas (TX)</p>
+            <p className="font-semibold inline-flex items-center gap-2">
+              <Circle className="h-3.5 w-3.5 fill-yellow-500 text-yellow-500" />
+              Texas (TX)
+            </p>
             <p className="text-gray-600 text-xs mt-1">Extensible pattern · TEA codes · Coming soon</p>
           </div>
           <div className="border rounded p-3 opacity-60">
-            <p className="font-semibold">🟢 California (CA)</p>
+            <p className="font-semibold inline-flex items-center gap-2">
+              <Circle className="h-3.5 w-3.5 fill-green-500 text-green-500" />
+              California (CA)
+            </p>
             <p className="text-gray-600 text-xs mt-1">A-G approval · CTE pathways · Coming soon</p>
           </div>
         </div>

@@ -1,4 +1,4 @@
-# 🚀 NEXT STEPS - API Keys Setup Guide
+#  NEXT STEPS - API Keys Setup Guide
 
 ## You are here → Add your 19 Gemini API keys and deploy
 
@@ -25,16 +25,16 @@ cd /Users/sanskarsachan/Documents/planpaths-data-miner
 pnpm run db:push
 
 # Expected output:
-# ✅ Migrations applied successfully
-# ✅ 3 tables created (api_keys, api_usage_logs, api_quota_resets)
+#  Migrations applied successfully
+#  3 tables created (api_keys, api_usage_logs, api_quota_resets)
 ```
 
 This creates:
-- ✅ `api_keys` table (for 19 keys)
-- ✅ `api_usage_logs` table (audit trail)
-- ✅ `api_quota_resets` table (reset history)
-- ✅ 3 SQL views (for monitoring)
-- ✅ 4 PostgreSQL functions (business logic)
+- `api_keys` table (for 19 keys)
+- `api_usage_logs` table (audit trail)
+- `api_quota_resets` table (reset history)
+- 3 SQL views (for monitoring)
+- 4 PostgreSQL functions (business logic)
 
 ---
 
@@ -74,7 +74,7 @@ VALUES
 ```
 
 6. Click "Run" button
-7. ✅ Should see: "19 rows inserted"
+7. Should see: "19 rows inserted"
 
 ### Option B: Via Command Line (Advanced)
 
@@ -165,7 +165,7 @@ curl http://localhost:3000/api/v2/quota/status
 #   "message": "20 of 20 requests available"
 # }
 
-# ✅ If you see this, quota system is working!
+#  If you see this, quota system is working!
 ```
 
 ---
@@ -322,17 +322,17 @@ curl -X POST http://localhost:3000/api/v2/admin/reset-quotas \
 
 ---
 
-## ✅ Success Criteria
+## Success Criteria
 
 You're done when:
 
-- ✅ `api_keys` table has 19 records with your keys
-- ✅ `CRON_SECRET` is set in .env.local and Vercel
-- ✅ `/api/v2/quota/status` returns `{ "available": true, "remaining": 20 }`
-- ✅ First PDF extraction decrements quota: 20 → 19
-- ✅ After 20 extractions, 21st returns 429 error
-- ✅ Dashboard shows real-time quota usage
-- ✅ Cron job successfully resets quota at 00:00 UTC
+- `api_keys` table has 19 records with your keys
+- `CRON_SECRET` is set in .env.local and Vercel
+- `/api/v2/quota/status` returns `{ "available": true, "remaining": 20 }`
+- First PDF extraction decrements quota: 20 → 19
+- After 20 extractions, 21st returns 429 error
+- Dashboard shows real-time quota usage
+- Cron job successfully resets quota at 00:00 UTC
 
 ---
 
@@ -364,6 +364,6 @@ You're done when:
 
 ---
 
-🎉 **You've got this! 30-40 minutes from now, you'll have a fully operational quota system.**
+ **You've got this! 30-40 minutes from now, you'll have a fully operational quota system.**
 
-Next: Add your 19 API keys! ⬆️
+Next: Add your 19 API keys! ⬆

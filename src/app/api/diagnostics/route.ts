@@ -5,14 +5,14 @@ export async function GET() {
   const supabase = createClient()
   const diagnostics: any = {
     timestamp: new Date().toISOString(),
-    supabase_url: process.env.NEXT_PUBLIC_SUPABASE_URL ? '✅ Set' : '❌ Missing',
-    supabase_anon_key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '✅ Set' : '❌ Missing',
+    supabase_url: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'OK: Set' : 'Missing',
+    supabase_anon_key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'OK: Set' : 'Missing',
     supabase_service_role_key: process.env.SUPABASE_SERVICE_ROLE_KEY 
-      ? (process.env.SUPABASE_SERVICE_ROLE_KEY.length > 100 ? '✅ Set (full)' : '⚠️ Set (incomplete - ends with ...)') 
-      : '❌ Missing',
+      ? (process.env.SUPABASE_SERVICE_ROLE_KEY.length > 100 ? 'OK: Set (full)' : 'Warning: Set (incomplete - ends with ...)') 
+      : 'Missing',
     gemini_api_key: process.env.GEMINI_API_KEY 
-      ? (process.env.GEMINI_API_KEY.length > 30 ? '✅ Set (full)' : '⚠️ Set (incomplete - ends with ...)') 
-      : '❌ Missing',
+      ? (process.env.GEMINI_API_KEY.length > 30 ? 'OK: Set (full)' : 'Warning: Set (incomplete - ends with ...)') 
+      : 'Missing',
     node_env: process.env.NODE_ENV,
   }
 
@@ -25,10 +25,10 @@ export async function GET() {
       .eq('is_active', true)
 
     if (keysError) {
-      diagnostics.database_connection = `❌ Error: ${keysError.message}`
+      diagnostics.database_connection = `Error: ${keysError.message}`
       diagnostics.database_error = keysError
     } else {
-      diagnostics.database_connection = `✅ Connected (${keys?.length || 0} active keys)`
+      diagnostics.database_connection = `OK: Connected (${keys?.length || 0} active keys)`
       diagnostics.api_keys = keys?.map(k => ({
         id: k.id,
         nickname: k.nickname,
@@ -37,7 +37,7 @@ export async function GET() {
       })) || []
     }
   } catch (err: any) {
-    diagnostics.database_connection = `❌ Exception: ${err.message}`
+    diagnostics.database_connection = `Exception: ${err.message}`
     diagnostics.error_details = {
       message: err.message,
       code: err.code,

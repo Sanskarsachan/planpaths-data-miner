@@ -384,7 +384,7 @@ export class ChunkProcessor {
           status          : 'chunk_complete',
           total,
           current         : chunkNum,
-          message         : `✓ Pages ${chunk.pageStart}–${chunk.pageEnd}: ${courses.length} course${courses.length !== 1 ? 's' : ''} found`,
+          message         : `Pages ${chunk.pageStart}–${chunk.pageEnd}: ${courses.length} course${courses.length !== 1 ? 's' : ''} found`,
           pageStart       : chunk.pageStart,
           pageEnd         : chunk.pageEnd,
           coursesFound    : courses.length,
@@ -393,7 +393,7 @@ export class ChunkProcessor {
           pagesProcessed  : this.usageStats.pagesProcessed,
         })
 
-        console.log(`[ChunkProcessor] ✓ Chunk ${chunkNum}/${total} | pages ${chunk.pageStart}-${chunk.pageEnd} | ${courses.length} courses | ${tokensUsed} tokens`)
+        console.log(`[ChunkProcessor] Chunk ${chunkNum}/${total} | pages ${chunk.pageStart}-${chunk.pageEnd} | ${courses.length} courses | ${tokensUsed} tokens`)
 
         if (i < chunks.length - 1) {
           this.onProgress({
@@ -424,13 +424,13 @@ export class ChunkProcessor {
           status         : 'chunk_error',
           total,
           current        : chunkNum,
-          message        : `✗ Pages ${chunk.pageStart}–${chunk.pageEnd} failed: ${msg.slice(0, 120)}`,
+          message        : `Pages ${chunk.pageStart}–${chunk.pageEnd} failed: ${msg.slice(0, 120)}`,
           pageStart      : chunk.pageStart,
           pageEnd        : chunk.pageEnd,
           pagesProcessed : this.usageStats.pagesProcessed,
         })
 
-        console.error(`[ChunkProcessor] ✗ Chunk ${chunkNum} (pages ${chunk.pageStart}-${chunk.pageEnd}) failed:`, msg)
+        console.error(`[ChunkProcessor] Chunk ${chunkNum} (pages ${chunk.pageStart}-${chunk.pageEnd}) failed:`, msg)
       }
     }
 
@@ -438,13 +438,13 @@ export class ChunkProcessor {
     const deduplicated = this.deduplicateCourses(allCourses)
     const dupesRemoved = beforeDedup - deduplicated.length
 
-    console.log(`[ChunkProcessor] ✅ Complete | ${deduplicated.length} courses | ${dupesRemoved} dupes removed | ${failedChunks.length} failed chunks`)
+    console.log(`[ChunkProcessor] Complete | ${deduplicated.length} courses | ${dupesRemoved} dupes removed | ${failedChunks.length} failed chunks`)
 
     this.onProgress({
       status          : 'processing',
       total,
       current         : total,
-      message         : `✅ Done — ${deduplicated.length} unique courses (${dupesRemoved} duplicates removed${failedChunks.length > 0 ? `, ${failedChunks.length} chunks failed` : ''})`,
+      message         : `Done: ${deduplicated.length} unique courses (${dupesRemoved} duplicates removed${failedChunks.length > 0 ? `, ${failedChunks.length} chunks failed` : ''})`,
       coursesFound    : deduplicated.length,
       tokensRemaining : this.getTokensRemaining(),
       pagesProcessed  : this.usageStats.pagesProcessed,

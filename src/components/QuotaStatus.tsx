@@ -7,6 +7,7 @@
 'use client'
 
 import { useQuota } from '@/lib/quota/useQuota'
+import { AlertTriangle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 interface QuotaStatusProps {
@@ -67,13 +68,15 @@ export function QuotaStatus({ compact = false, refreshInterval = 30000 }: QuotaS
         </p>
 
         {isExhausted && (
-          <p className="text-xs font-medium text-red-600">
-            ⚠️ Quota exhausted. Resets {new Date(quota.quota.reset_at).toLocaleString()}
+          <p className="text-xs font-medium text-red-600 inline-flex items-center gap-1">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            Quota exhausted. Resets {new Date(quota.quota.reset_at).toLocaleString()}
           </p>
         )}
         {isWarning && !isExhausted && (
-          <p className="text-xs font-medium text-amber-600">
-            ⚠️ Approaching limit. Resets {new Date(quota.quota.reset_at).toLocaleString()}
+          <p className="text-xs font-medium text-amber-600 inline-flex items-center gap-1">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            Approaching limit. Resets {new Date(quota.quota.reset_at).toLocaleString()}
           </p>
         )}
         {!isWarning && (

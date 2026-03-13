@@ -10,7 +10,7 @@ User uploads PDF
     ↓
 Silent extraction (no logs, no progress)
     ↓
-Returns: courses_found: 0 ❌
+Returns: courses_found: 0 
 ```
 
 ### After (Fixed)
@@ -21,7 +21,7 @@ ChunkProcessor detects format → Splits into chunks
     ↓
 Emits real-time progress → "Processing pages 1-5: 12 courses..."
     ↓
-Returns: courses_found: 127 ✅
+Returns: courses_found: 127 
 ```
 
 ## How to Test
@@ -41,11 +41,11 @@ npm run dev
 
 ### 3. Watch Progress in Real-Time
 The dashboard now shows:
-- ✓ Format detected (master_db, k12, or regular)
-- ✓ Chunk progress (e.g., "Processing pages 1-5 (chunk 1/5)…")
-- ✓ Courses found per chunk (e.g., "42 courses found")
-- ✓ Total processing time
-- ✓ Results table with extracted courses
+- Format detected (master_db, k12, or regular)
+- Chunk progress (e.g., "Processing pages 1-5 (chunk 1/5)…")
+- Courses found per chunk (e.g., "42 courses found")
+- Total processing time
+- Results table with extracted courses
 
 ### 4. Check Server Logs
 Terminal shows detailed extraction trace:
@@ -53,9 +53,9 @@ Terminal shows detailed extraction trace:
 [ChunkProcessor] ▶ processDocument | format=master_db chunks=1
 [ChunkProcessor] → Gemini API | pages 1-40 | 284923 chars
 [ChunkProcessor] ← 127 courses | 45231 tokens
-[ChunkProcessor] ✓ Chunk 1/1 | pages 1-40 | 127 courses
+[ChunkProcessor]  Chunk 1/1 | pages 1-40 | 127 courses
 [ChunkProcessor] Dedup: 127 → 119 (removed 8)
-[ChunkProcessor] ✅ Complete | 119 courses
+[ChunkProcessor]  Complete | 119 courses
 [Extract] Complete | 119 courses | 2305ms
 ```
 
@@ -66,7 +66,7 @@ Terminal shows detailed extraction trace:
 | `src/lib/extraction/ChunkProcessor.ts` | **NEW** - Unified extraction engine with format detection, page-aware chunking, progress events |
 | `src/app/api/extract/route.ts` | Updated to use ChunkProcessor instead of SmartChunker + GeminiExtractor |
 | `src/lib/extraction/JobStore.ts` | Added `processing_status` and `pagesProcessed` fields for UI updates |
-| `src/lib/extraction/__tests__/ChunkProcessor.test.ts` | **NEW** - 15 comprehensive tests (all passing ✅) |
+| `src/lib/extraction/__tests__/ChunkProcessor.test.ts` | **NEW** - 15 comprehensive tests (all passing ) |
 | `EXTRACTION_OVERHAUL.md` | **NEW** - Detailed technical documentation |
 
 ## What Actually Fixed
@@ -101,28 +101,28 @@ Terminal shows detailed extraction trace:
 ```
 Input: Florida Master Course Database (30+ pages)
 Expected: Extracts all courses with proper codes (e.g., "1001300")
-Status: ✅ WORKING
+Status:  WORKING
 ```
 
 ### Test Case 2: K12 School Catalog
 ```
 Input: High school course catalog with course codes
 Expected: Detects k12 format, extracts courses despite varied formatting
-Status: ✅ WORKING
+Status:  WORKING
 ```
 
 ### Test Case 3: Large PDF (100+ pages)
 ```
 Input: Big PDF with 500+ courses
 Expected: Batches properly, shows progress, completes without timeout
-Status: ✅ WORKING
+Status:  WORKING
 ```
 
 ### Test Case 4: API Quota Exhaustion
 ```
 Input: Sequential uploads until free tier quota exhausted
 Expected: Shows quota error, prevents further processing
-Status: ✅ WORKING
+Status:  WORKING
 ```
 
 ## Run Unit Tests
@@ -135,7 +135,7 @@ npm test -- src/lib/extraction/__tests__/ChunkProcessor.test.ts --no-coverage
 Output:
 ```
 PASS src/lib/extraction/__tests__/ChunkProcessor.test.ts
-  ✓ 15 tests passed
+   15 tests passed
 ```
 
 ## Verify Compilation
@@ -145,7 +145,7 @@ Build succeeds with no errors:
 npm run build
 ```
 
-Status: ✅ Successfully compiled
+Status:  Successfully compiled
 
 ---
 
@@ -168,7 +168,7 @@ Status: ✅ Successfully compiled
 
 ---
 
-**Status:** ✅ **PRODUCTION READY**
+**Status:**  **PRODUCTION READY**
 
 All tests passing, build succeeding, ready for live testing.
 The extraction pipeline is now fully functional with real-time progress and proper error handling.

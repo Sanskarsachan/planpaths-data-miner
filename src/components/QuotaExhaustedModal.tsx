@@ -5,6 +5,8 @@
 
 'use client'
 
+import { AlertTriangle } from 'lucide-react'
+
 interface QuotaExhaustedModalProps {
   isOpen: boolean
   resetAt: Date | null
@@ -32,7 +34,7 @@ export function QuotaExhaustedModal({
       <div className="relative bg-white rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 flex items-center justify-center bg-red-100 rounded-full">
-            <span className="text-xl">⚠️</span>
+            <AlertTriangle className="w-5 h-5 text-red-700" />
           </div>
           <div>
             <h2 className="font-bold text-gray-900">Daily Quota Exhausted</h2>

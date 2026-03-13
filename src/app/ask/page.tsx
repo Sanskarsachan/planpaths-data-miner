@@ -1,6 +1,7 @@
 'use client'
 
 import { Header } from '@/components/Header'
+import { AlertCircle, MessageSquare, MoveRight } from 'lucide-react'
 
 export default function AskPage() {
 
@@ -25,7 +26,9 @@ export default function AskPage() {
       {/* Body */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, gap: 32, overflow: 'auto' }}>
         {/* Glow orb */}
-        <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg, #603AC8 0%, #31225C 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, boxShadow: '0 0 0 12px rgba(96,58,200,0.1), 0 0 0 28px rgba(96,58,200,0.05)' }}>💬</div>
+        <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg, #603AC8 0%, #31225C 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 12px rgba(96,58,200,0.1), 0 0 0 28px rgba(96,58,200,0.05)' }}>
+          <MessageSquare size={30} color='#fff' strokeWidth={2.2} />
+        </div>
 
         <div style={{ textAlign: 'center', maxWidth: 480 }}>
           <div style={{ fontSize: 24, fontWeight: 700, color: '#fff', marginBottom: 10, letterSpacing: '-0.5px' }}>
@@ -38,7 +41,7 @@ export default function AskPage() {
 
         {/* Fake search bar */}
         <div style={{ width: '100%', maxWidth: 540, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 14, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 10, opacity: 0.5, cursor: 'not-allowed' }}>
-          <span style={{ fontSize: 16 }}>💬</span>
+          <MessageSquare size={16} color='rgba(255,255,255,0.5)' strokeWidth={2.1} />
           <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.25)', fontStyle: 'italic' }}>
             Ask a question about your course data…
           </span>
@@ -54,14 +57,14 @@ export default function AskPage() {
           </div>
           {suggestions.map((s, i) => (
             <div key={i} style={{ padding: '10px 14px', borderRadius: 9, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 13, color: 'rgba(255,255,255,0.35)', cursor: 'not-allowed', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 12, color: 'rgba(96,58,200,0.5)' }}>→</span>
+              <MoveRight size={12} color='rgba(96,58,200,0.5)' strokeWidth={2.2} />
               {s}
             </div>
           ))}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 20, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', fontSize: 12, color: '#fbbf24' }}>
-          <span>🚧</span> This module is under development — extract data first
+          <AlertCircle size={14} color='#fbbf24' strokeWidth={2.2} /> This module is under development - extract data first
         </div>
       </div>
     </div>

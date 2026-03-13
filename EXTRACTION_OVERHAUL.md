@@ -9,17 +9,17 @@ The extraction pipeline has been completely rebuilt with a production-ready `Chu
 Replaces the old SmartChunker + GeminiExtractor + custom deduplication with a unified, robust system:
 
 **Major Improvements:**
-- ✅ **Format Detection**: Automatic detection of master_db (pipe headers + 7-digit codes), k12 (dash prefixes, asterisks), and regular catalogs
-- ✅ **Page-Aware Chunking**: Uses `---PAGE_BREAK---` markers to split documents precisely without truncating courses
-- ✅ **Context Overlap**: Each chunk inherits the last 400 characters of the previous chunk to prevent boundary course loss
-- ✅ **Real Token Tracking**: Reads `usageMetadata.totalTokenCount` from Gemini API responses
-- ✅ **Progress Events**: Emits `ProcessProgress` updates with real-time status, page ranges, and token metrics
-- ✅ **Robust Error Handling**: Non-fatal chunk failures don't block extraction (partial results preserved)
-- ✅ **Proper Deduplication**: Uses normalized skeleton keys (name hash + code/grade) instead of raw text matching
-- ✅ **Vercel-Safe Timeouts**: 55-second hard timeout (below Vercel's 60s limit) with graceful fallback
-- ✅ **Retry Logic**: Exponential backoff with 3 retry attempts for transient failures
-- ✅ **Category Carry-Forward**: Last seen category inherited in subsequent sections
-- ✅ **Master DB Special Handling**: Still processes as single chunk when detected
+- **Format Detection**: Automatic detection of master_db (pipe headers + 7-digit codes), k12 (dash prefixes, asterisks), and regular catalogs
+- **Page-Aware Chunking**: Uses `---PAGE_BREAK---` markers to split documents precisely without truncating courses
+- **Context Overlap**: Each chunk inherits the last 400 characters of the previous chunk to prevent boundary course loss
+- **Real Token Tracking**: Reads `usageMetadata.totalTokenCount` from Gemini API responses
+- **Progress Events**: Emits `ProcessProgress` updates with real-time status, page ranges, and token metrics
+- **Robust Error Handling**: Non-fatal chunk failures don't block extraction (partial results preserved)
+- **Proper Deduplication**: Uses normalized skeleton keys (name hash + code/grade) instead of raw text matching
+- **Vercel-Safe Timeouts**: 55-second hard timeout (below Vercel's 60s limit) with graceful fallback
+- **Retry Logic**: Exponential backoff with 3 retry attempts for transient failures
+- **Category Carry-Forward**: Last seen category inherited in subsequent sections
+- **Master DB Special Handling**: Still processes as single chunk when detected
 
 ### 2. **Updated Extract Route** (`src/app/api/extract/route.ts`)
 Refactored `runExtraction()` to use ChunkProcessor:
@@ -44,7 +44,7 @@ Added fields for progress tracking:
 - Error callbacks
 - Deduplication logic
 
-**Test Results: ✅ All 15 tests passing**
+**Test Results:  All 15 tests passing**
 
 ## How It Works
 
@@ -77,9 +77,9 @@ PDF Upload
 The extraction now emits specific progress events:
 - `processing`: "Detected master_db format — split into 5 chunks"
 - `processing`: "Processing pages 1–5 (chunk 1/5)…"
-- `chunk_complete`: "✓ Pages 1–5: 42 courses found"
+- `chunk_complete`: " Pages 1–5: 42 courses found"
 - `waiting`: "Waiting before next batch…"
-- `chunk_error`: "✗ Pages 6–10: API timeout (retrying)"
+- `chunk_error`: " Pages 6–10: API timeout (retrying)"
 - Final completion with totals and dedup stats
 
 ### Silent Failure Fixes
@@ -113,9 +113,9 @@ State: "Florida"
 [ChunkProcessor] ▶ processDocument | format=master_db chunks=1 apiKeyId=xxxxxxxx
 [ChunkProcessor] → Gemini API | attempt 1/3 | pages 1-40 | 284923 chars
 [ChunkProcessor] ← 127 courses | 45231 tokens
-[ChunkProcessor] ✓ Chunk 1/1 | pages 1-40 | 127 courses | 45231 tokens
+[ChunkProcessor]  Chunk 1/1 | pages 1-40 | 127 courses | 45231 tokens
 [ChunkProcessor] Dedup: 127 → 119 (removed 8)
-[ChunkProcessor] ✅ Complete | 119 courses | removed 8 dupes | 0 failed chunks
+[ChunkProcessor]  Complete | 119 courses | removed 8 dupes | 0 failed chunks
 [Extract] Complete | 119 courses | 2305ms | tokens: 45231
 ```
 
@@ -125,7 +125,7 @@ State: "Florida"
   id: "a68a1163-0e96-4bd9-a012-5bfa2d32a19f",
   school_slug: "miami-central-high-school",
   status: "processing" → "processing" → ... → "complete",
-  processing_status: "Detecting format..." → "Processing pages 1–40..." → "✅ Done",
+  processing_status: "Detecting format..." → "Processing pages 1–40..." → " Done",
   pagesProcessed: 0 → 10 → 20 → 30 → 40,
   courses_found: 0 → 119,
   dupes_removed: 0 → 8,
@@ -141,7 +141,7 @@ State: "Florida"
 ### UI Feedback (Real-Time)
 The `ExtractForm` component polls `/api/extract/[uploadId]` every 1.5s and displays:
 - Progress bar (1/1 chunks complete)
-- "✓ Processing pages 1–40: 127 courses found"
+- " Processing pages 1–40: 127 courses found"
 - Results table with all extracted courses
 - Processing time and token usage
 
@@ -245,18 +245,18 @@ Extraction benchmarks on typical high school catalog:
 
 ## What's Fixed
 
-✅ Extraction now **returns actual courses** instead of empty arrays  
-✅ Progress **emitted in real-time** to UI  
-✅ Errors **surfaced to user** instead of silent failures  
-✅ Format **automatically detected** (no hardcoded assumptions)  
-✅ Page-awareness **prevents course truncation** at boundaries  
-✅ Token tracking **enables quota management**  
-✅ Retry logic **handles transient API failures**  
-✅ Deduplication **uses intelligent keys** not raw text  
-✅ Timeouts **respect Vercel limits** safely  
-✅ Tests **validate core logic** comprehensively  
+ Extraction now **returns actual courses** instead of empty arrays  
+ Progress **emitted in real-time** to UI  
+ Errors **surfaced to user** instead of silent failures  
+ Format **automatically detected** (no hardcoded assumptions)  
+ Page-awareness **prevents course truncation** at boundaries  
+ Token tracking **enables quota management**  
+ Retry logic **handles transient API failures**  
+ Deduplication **uses intelligent keys** not raw text  
+ Timeouts **respect Vercel limits** safely  
+ Tests **validate core logic** comprehensively  
 
 ---
 
-**Status:** ✅ **PRODUCTION READY**
+**Status:**  **PRODUCTION READY**
 All tests passing, compilation succeeds, ready for live testing.

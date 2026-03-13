@@ -27,7 +27,7 @@ async function POST(req: Request) {
     { auth: { persistSession: false } }
   )
   const quotaMgr = new QuotaManager(serviceSupabase, (msg, level) => {
-    const prefix = level === 'error' ? '❌' : level === 'warn' ? '⚠️' : 'ℹ️'
+    const prefix = level === 'error' ? '[ERROR]' : level === 'warn' ? '[WARN]' : '[INFO]'
     console.log(`${prefix} ${msg}`)
   })
 
@@ -126,7 +126,7 @@ async function runExtraction(
   )
   
   const quotaMgr = options?.quotaMgr || new QuotaManager(serviceSupabase, (msg, level) => {
-    const prefix = level === 'error' ? '❌' : level === 'warn' ? '⚠️' : 'ℹ️'
+    const prefix = level === 'error' ? '[ERROR]' : level === 'warn' ? '[WARN]' : '[INFO]'
     console.log(`${prefix} ${msg}`)
   })
 

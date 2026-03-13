@@ -239,9 +239,9 @@ export function MasterDBImport() {
                 <span className="font-medium">Database Triggers:</span>
               </p>
               <ul className="text-sm text-blue-900 space-y-1 ml-4">
-                <li>✓ Normalization triggers activated</li>
-                <li>✓ Honors designations normalized</li>
-                <li>✓ All courses indexed for mapping</li>
+                <li>Normalization triggers activated</li>
+                <li>Honors designations normalized</li>
+                <li>All courses indexed for mapping</li>
               </ul>
             </div>
 

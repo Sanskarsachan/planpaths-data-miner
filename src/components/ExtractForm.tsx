@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { BarChart3, CheckCircle2, Search, Save, Trash2, Zap } from 'lucide-react'
 import { Header } from './Header'
 
 type Status = 'idle' | 'extracting' | 'done' | 'failed'
@@ -344,7 +345,7 @@ export function ExtractForm() {
       }
 
       setSaveStatus('saved')
-      setSaveMessage(`✓ Saved ${data.saved} courses to database`)
+      setSaveMessage(`Saved ${data.saved} courses to database`)
       
       setTimeout(() => {
         setSaveStatus('idle')
@@ -464,7 +465,7 @@ export function ExtractForm() {
           <div>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: 1, marginBottom: 8 }}>API KEY</div>
             <select value={selectedApiKey} onChange={e => setSelectedApiKey(e.target.value)} style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.04)', color: '#e2e0ea' }}>
-              <option value='auto'>🤖 Auto-select best key</option>
+              <option value='auto'>Auto-select best key</option>
               {apiKeys.map(k => (
                 <option key={k.id} value={k.id} disabled={!k.is_active}>
                   {k.nickname} ({k.quota_remaining}/{k.quota_limit})
@@ -473,9 +474,9 @@ export function ExtractForm() {
             </select>
             <div style={{ marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,.45)' }}>
               {selectedApiKey === 'auto'
-                ? '🤖 Auto-select best key'
+                ? 'Auto-select best key'
                 : selectedApiKeyMeta
-                  ? `✓ ${selectedApiKeyMeta.nickname} (${selectedApiKeyMeta.quota_remaining}/${selectedApiKeyMeta.quota_limit})`
+                  ? `Selected ${selectedApiKeyMeta.nickname} (${selectedApiKeyMeta.quota_remaining}/${selectedApiKeyMeta.quota_limit})`
                   : 'Selected key unavailable'}
             </div>
             {selectedApiKeyMeta && (
@@ -521,8 +522,9 @@ export function ExtractForm() {
           </div>
 
           <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <button onClick={handleExtract} disabled={status === 'extracting'} style={{ padding: '12px 0', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #603AC8, #31225C)', color: '#fff', fontWeight: 700, cursor: status === 'extracting' ? 'not-allowed' : 'pointer', opacity: status === 'extracting' ? 0.6 : 1 }}>
-              {status === 'extracting' ? `Extracting ${selectedRangeLabel}… ${elapsed}s` : `⚡ Extract ${selectedRangeLabel}`}
+            <button onClick={handleExtract} disabled={status === 'extracting'} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 0', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #603AC8, #31225C)', color: '#fff', fontWeight: 700, cursor: status === 'extracting' ? 'not-allowed' : 'pointer', opacity: status === 'extracting' ? 0.6 : 1 }}>
+              <Zap size={14} />
+              {status === 'extracting' ? `Extracting ${selectedRangeLabel}... ${elapsed}s` : `Extract ${selectedRangeLabel}`}
             </button>
             {selectedRange !== 'all' && (
               <div style={{ fontSize: 11, color: '#fcd34d', background: 'rgba(120,53,15,.25)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 8, padding: '8px 10px' }}>
@@ -576,7 +578,10 @@ export function ExtractForm() {
                   fontWeight: 500,
                 }}
               >
-                🗑️ Clear
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Trash2 size={12} />
+                  Clear
+                </span>
               </button>
             )}
           </div>
@@ -593,17 +598,19 @@ export function ExtractForm() {
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, background: 'rgba(255,255,255,.05)', padding: '8px 12px', flex: 1, maxWidth: 340 }}>
-              <span style={{ opacity: 0.6 }}>🔍</span>
+              <Search size={14} style={{ opacity: 0.6 }} />
               <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder='Search courses, codes, categories…' style={{ border: 'none', outline: 'none', width: '100%', background: 'none', color: '#e2e0ea' }} />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {courses.length > 0 && (
                 <>
-                  <button onClick={saveToDatabase} disabled={saveStatus === 'saving'} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid rgba(96,58,200,0.3)', background: saveStatus === 'saved' ? 'rgba(34,197,94,0.15)' : 'rgba(96,58,200,0.1)', color: saveStatus === 'saved' ? '#4ade80' : '#a78bfa', fontSize: 12, fontWeight: 600, cursor: saveStatus === 'saving' ? 'not-allowed' : 'pointer', transition: 'all 0.2s', fontFamily: "'DM Sans', sans-serif" }}>
-                    {saveStatus === 'saving' ? '💾 Saving...' : saveStatus === 'saved' ? '✓ Saved' : '💾 Save to DB'}
+                  <button onClick={saveToDatabase} disabled={saveStatus === 'saving'} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1px solid rgba(96,58,200,0.3)', background: saveStatus === 'saved' ? 'rgba(34,197,94,0.15)' : 'rgba(96,58,200,0.1)', color: saveStatus === 'saved' ? '#4ade80' : '#a78bfa', fontSize: 12, fontWeight: 600, cursor: saveStatus === 'saving' ? 'not-allowed' : 'pointer', transition: 'all 0.2s', fontFamily: "'DM Sans', sans-serif" }}>
+                    {saveStatus === 'saved' ? <CheckCircle2 size={13} /> : <Save size={13} />}
+                    {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved' : 'Save to DB'}
                   </button>
-                  <button onClick={exportToCSV} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.65)', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', fontFamily: "'DM Sans', sans-serif" }}>
-                    📊 Export CSV
+                  <button onClick={exportToCSV} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.65)', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', fontFamily: "'DM Sans', sans-serif" }}>
+                    <BarChart3 size={13} />
+                    Export CSV
                   </button>
                 </>
               )}

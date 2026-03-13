@@ -17,7 +17,7 @@ export async function GET() {
     supabase_anon_key_set: !!supabaseAnonKey,
     supabase_service_key_set: !!supabaseServiceKey,
     service_key_length: supabaseServiceKey?.length || 0,
-    service_key_complete: supabaseServiceKey && supabaseServiceKey.length > 100 ? '✅ Complete' : '❌ Incomplete'
+    service_key_complete: supabaseServiceKey && supabaseServiceKey.length > 100 ? 'Complete' : 'Incomplete'
   }
 
   // Test 2: Simple fetch to Supabase REST API
@@ -44,13 +44,13 @@ export async function GET() {
 
     const elapsed = Date.now() - startTime
     results.network_tests.rest_api = {
-      status: '✅ OK',
+      status: 'OK',
       response_time_ms: elapsed,
       status_code: (response as any)?.status
     }
   } catch (err: any) {
     results.network_tests.rest_api = {
-      status: '❌ Failed',
+      status: 'Failed',
       error: err.message,
       error_code: err.code || 'unknown'
     }
@@ -63,12 +63,12 @@ export async function GET() {
     const resolver = new Resolver()
     const addresses = await resolver.resolve4('emowefxzeqkksjnddzip.supabase.co')
     results.network_tests.dns = {
-      status: '✅ Resolved',
+      status: 'Resolved',
       addresses: addresses
     }
   } catch (err: any) {
     results.network_tests.dns = {
-      status: '❌ Failed',
+      status: 'Failed',
       error: err.message
     }
   }
@@ -94,21 +94,21 @@ export async function GET() {
 
     if (error) {
       results.network_tests.supabase_client = {
-        status: '❌ Database Error',
+        status: 'Database Error',
         error: error.message,
         error_code: error.code,
         response_time_ms: elapsed
       }
     } else {
       results.network_tests.supabase_client = {
-        status: '✅ OK',
+        status: 'OK',
         response_time_ms: elapsed,
         tables_accessible: true
       }
     }
   } catch (err: any) {
     results.network_tests.supabase_client = {
-      status: '❌ Connection Failed',
+      status: 'Connection Failed',
       error: err.message,
       error_code: err.code || 'unknown'
     }
@@ -136,24 +136,24 @@ export async function GET() {
   // Test 7: Recommendations
   results.recommendations = []
 
-  if (!results.environment.supabase_service_key_set || results.environment.service_key_complete === '❌ Incomplete') {
-    results.recommendations.push('❌ CRITICAL: SUPABASE_SERVICE_ROLE_KEY is incomplete or missing. Get the full key from Supabase Settings → API')
+  if (!results.environment.supabase_service_key_set || results.environment.service_key_complete === 'Incomplete') {
+    results.recommendations.push('CRITICAL: SUPABASE_SERVICE_ROLE_KEY is incomplete or missing. Get the full key from Supabase Settings -> API')
   }
 
   if (results.network_tests.rest_api?.status?.includes('Failed')) {
-    results.recommendations.push('⚠️ Cannot connect to Supabase REST API. This could be: (1) Network firewall blocking, (2) ISP policy, (3) Wrong Supabase URL, or (4) Server down')
+    results.recommendations.push('Warning: Cannot connect to Supabase REST API. This could be: (1) Network firewall blocking, (2) ISP policy, (3) Wrong Supabase URL, or (4) Server down')
   }
 
   if (results.network_tests.dns?.status?.includes('Failed')) {
-    results.recommendations.push('⚠️ DNS resolution to supabase.co is failing. Check your network DNS settings')
+    results.recommendations.push('Warning: DNS resolution to supabase.co is failing. Check your network DNS settings')
   }
 
   if (results.network_tests.rest_api?.status?.includes('OK') && results.network_tests.supabase_client?.status?.includes('Failed')) {
-    results.recommendations.push('ℹ️ REST API works but supabase-js client fails. This suggests an authentication or query issue, not network')
+    results.recommendations.push('Info: REST API works but supabase-js client fails. This suggests an authentication or query issue, not network')
   }
 
   results.summary = {
-    environment_ok: results.environment.supabase_service_key_complete === '✅ Complete' && results.environment.supabase_url_set,
+    environment_ok: results.environment.service_key_complete === 'Complete' && results.environment.supabase_url_set,
     network_ok: Object.values(results.network_tests).some((test: any) => test.status?.includes('OK')),
     supabase_connected: results.network_tests.supabase_client?.status?.includes('OK') || results.network_tests.rest_api?.status?.includes('OK'),
     all_tests_pass: Object.values(results.network_tests).every((test: any) => test.status?.includes('OK'))

@@ -1,14 +1,14 @@
 # v1.3.0 - Complete Frontend & Testing
 
-## 🎉 What's New in This Release
+## What's New in This Release
 
-### ✨ Complete Frontend Implementation
+### Complete Frontend Implementation
 - **ExtractForm Component** - Interactive PDF upload with real-time validation
 - **MappingViewer Component** - Live course mapping with 27-pass visualization
 - **MasterDBImport Component** - CSV import with download template
 - All three pages now fully functional and production-ready
 
-### 🧪 Comprehensive Test Suite
+### Comprehensive Test Suite
 - Component tests for ExtractForm, MappingViewer, MasterDBImport
 - API route tests for /api/extract and related endpoints
 - Utility tests for hashCourse and StateDetector functions
@@ -16,7 +16,7 @@
 - 4+ test files covering critical paths
 - `pnpm test` command ready to use
 
-## 📚 Documentation Structure
+## Documentation Structure
 
 Guides are organized by use case:
 
@@ -29,7 +29,7 @@ Guides are organized by use case:
 | [TESTING_SETUP.md](./TESTING_SETUP.md) | Jest test infrastructure | Developers |
 | [COMPLETION_SUMMARY.md](./COMPLETION_SUMMARY.md) | v1.1.0 completion report | Project tracking |
 
-## 🚀 Core Features
+## Core Features
 
 ### 1. PDF Extraction Pipeline
 ```
@@ -62,7 +62,7 @@ course_code,name,category
 
 **Flow**: POST `/api/master-db/import` → Staging table → Import function → Auto-normalize
 
-## 💾 Database
+## Database
 
 9 tables with 32 optimized indexes:
 - `schools` - School metadata
@@ -79,7 +79,7 @@ PostgreSQL 15 with:
 - 27-pass mapping engine
 - CSV import pipeline
 
-## 🔌 API Endpoints (All 6 Implemented)
+## API Endpoints (All 6 Implemented)
 
 ```
 POST   /api/extract                    → Async PDF extraction
@@ -92,12 +92,12 @@ POST   /api/master-db/import           → Import CSV master database
 ```
 
 All endpoints with:
-- ✅ Full error handling
-- ✅ Type-safe request/response
-- ✅ Supabase integration
-- ✅ Detailed logging
+- Full error handling
+- Type-safe request/response
+- Supabase integration
+- Detailed logging
 
-## 🎨 Frontend Pages (All 3 Implemented)
+## Frontend Pages (All 3 Implemented)
 
 ### /extract
 Interactive form to upload PDFs:
@@ -123,7 +123,7 @@ Master database import interface:
 - Category distribution
 - Course code breakdown (6-digit vs 7-digit)
 
-## 🧪 Testing
+## Testing
 
 Run tests with:
 ```bash
@@ -140,18 +140,18 @@ Test files:
 
 See [TESTING_SETUP.md](./TESTING_SETUP.md) for complete testing documentation.
 
-## 📊 Project Status
+## Project Status
 
 **Completed (v1.3.0)**:
-- ✅ Next.js 15 + TypeScript setup
-- ✅ Supabase PostgreSQL integration
-- ✅ Database schema (9 tables, 32 indexes, 4 migrations)
-- ✅ 6 API endpoints (full implementation)
-- ✅ 3 frontend pages with forms
-- ✅ Extraction pipeline (state detection, chunking, Gemini, deduplication)
-- ✅ 27-pass mapping engine (SQL-first, zero AI cost)
-- ✅ Jest test suite (13+ tests)
-- ✅ Comprehensive documentation (6+ guides)
+- Next.js 15 + TypeScript setup
+- Supabase PostgreSQL integration
+- Database schema (9 tables, 32 indexes, 4 migrations)
+- 6 API endpoints (full implementation)
+- 3 frontend pages with forms
+- Extraction pipeline (state detection, chunking, Gemini, deduplication)
+- 27-pass mapping engine (SQL-first, zero AI cost)
+- Jest test suite (13+ tests)
+- Comprehensive documentation (6+ guides)
 
 **Available for Future Enhancement**:
 - ⏳ Batch processing (multiple PDFs)
@@ -163,7 +163,7 @@ See [TESTING_SETUP.md](./TESTING_SETUP.md) for complete testing documentation.
 - ⏳ Rate limiting
 - ⏳ Advanced fuzzy matching
 
-## 🛠 Development Workflow
+## Development Workflow
 
 1. **Start dev server**
    ```bash
@@ -188,14 +188,14 @@ See [TESTING_SETUP.md](./TESTING_SETUP.md) for complete testing documentation.
    - Supabase migrations already deployed
    - Next.js app ready for Vercel/self-hosted
 
-## 📈 Version History
+## Version History
 
 - **v1.3.0** - Frontend UI + Jest test suite
 - **v1.2.0** - Interactive frontend pages
 - **v1.1.0** - Complete API endpoints
 - **v1.0.0** - Initial project setup
 
-## 🤝 Contributing
+## Contributing
 
 1. Create feature branch: `git checkout -b feature/my-feature`
 2. Make changes with tests
@@ -203,13 +203,13 @@ See [TESTING_SETUP.md](./TESTING_SETUP.md) for complete testing documentation.
 4. Commit with message: `feat: describe change [vX.X.X]`
 5. Push and create PR
 
-## 📞 Support
+## Support
 
 - **Setup help** → [SETUP_CHECKLIST.md](./SETUP_CHECKLIST.md)
 - **Testing help** → [TESTING_GUIDE.md](./TESTING_GUIDE.md)
 - **API help** → [API_REFERENCE.md](./API_REFERENCE.md)
 - **Test writing** → [TESTING_SETUP.md](./TESTING_SETUP.md)
 
-## 📝 License
+## License
 
 MIT

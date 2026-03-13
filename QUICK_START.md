@@ -1,6 +1,6 @@
 # Quick Start - 5 Minute Setup
 
-## 1️⃣ Environment (30 seconds)
+## 1⃣ Environment (30 seconds)
 ```bash
 cd /Users/sanskarsachan/Documents/planpaths-data-miner
 cp .env.local.example .env.local
@@ -18,7 +18,7 @@ GEMINI_API_KEY=your-key
 - Supabase: https://supabase.com → Create project → Settings → API
 - Gemini: https://makersuite.google.com/app/apikey
 
-## 2️⃣ Database Setup (2 minutes)
+## 2⃣ Database Setup (2 minutes)
 
 ### Option A: Dashboard (Easy)
 1. Go to https://app.supabase.com
@@ -35,13 +35,13 @@ supabase link --project-ref your-project-id
 supabase db push
 ```
 
-## 3️⃣ Start Server (30 seconds)
+## 3⃣ Start Server (30 seconds)
 ```bash
 pnpm dev
 # Open http://localhost:3000
 ```
 
-## 4️⃣ Test Extraction (1 minute)
+## 4⃣ Test Extraction (1 minute)
 
 ```bash
 # Generate test PDF
@@ -65,7 +65,7 @@ Expected output (status="complete" after 3-8 seconds):
 10
 ```
 
-## ✅ Done!
+## Done!
 
 All 6 API endpoints are ready to use:
 
@@ -82,7 +82,7 @@ See [API_REFERENCE.md](./API_REFERENCE.md) for full endpoint details.
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 - **Need help with setup?** → [SETUP_CHECKLIST.md](./SETUP_CHECKLIST.md)
 - **Need test instructions?** → [TESTING_GUIDE.md](./TESTING_GUIDE.md)
@@ -104,4 +104,4 @@ See [TESTING_GUIDE.md](./TESTING_GUIDE.md#debugging) for detailed troubleshootin
 
 ---
 
-**You're ready! Start with Step 1 above.** 🚀
+**You're ready! Start with Step 1 above.** 
