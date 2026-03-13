@@ -5,10 +5,9 @@ describe('hashCourse Utility', () => {
     const schoolSlug = 'test-high-school'
     const courseCode = '6101010'
     const name = 'English I'
-    const category = 'English Language Arts'
 
-    const hash1 = hashCourse(schoolSlug, courseCode, name, category)
-    const hash2 = hashCourse(schoolSlug, courseCode, name, category)
+    const hash1 = hashCourse(name, courseCode, schoolSlug)
+    const hash2 = hashCourse(name, courseCode, schoolSlug)
 
     expect(hash1).toBe(hash2)
   })
@@ -17,40 +16,32 @@ describe('hashCourse Utility', () => {
     const schoolSlug = 'test-high-school'
     const baseCode = '6101010'
     const baseName = 'English I'
-    const baseCategory = 'English Language Arts'
 
-    const hash1 = hashCourse(schoolSlug, baseCode, baseName, baseCategory)
-    const hash2 = hashCourse(schoolSlug, baseCode, 'English II', baseCategory) // Different name
+    const hash1 = hashCourse(baseName, baseCode, schoolSlug)
+    const hash2 = hashCourse('English II', baseCode, schoolSlug) // Different name
 
     expect(hash1).not.toBe(hash2)
   })
 
-  it('returns a 64-character SHA-256 hash', () => {
-    const hash = hashCourse(
-      'test-school',
-      '6101010',
-      'English I',
-      'English Language Arts'
-    )
+  it('returns a 16-character truncated SHA-256 hash', () => {
+    const hash = hashCourse('English I', '6101010', 'test-school')
 
-    // SHA-256 hash in hex is 64 characters
-    expect(hash).toMatch(/^[a-f0-9]{64}$/)
+    expect(hash).toMatch(/^[a-f0-9]{16}$/)
   })
 
   it('handles special characters in input', () => {
     expect(() => {
       hashCourse(
-        'school-with-"quotes"',
-        '6101010',
         "O'Brien's English",
-        'English & Language'
+        '6101010',
+        'school-with-"quotes"'
       )
     }).not.toThrow()
   })
 
   it('treats whitespace differences as different hashes', () => {
-    const hash1 = hashCourse('school', '6101010', 'English I', 'English')
-    const hash2 = hashCourse('school', '6101010', 'English  I', 'English') // Extra space
+    const hash1 = hashCourse('English I', '6101010', 'school')
+    const hash2 = hashCourse('English  I', '6101010', 'school') // Extra space
 
     expect(hash1).not.toBe(hash2)
   })
