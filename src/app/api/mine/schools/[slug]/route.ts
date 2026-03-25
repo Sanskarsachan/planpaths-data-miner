@@ -2,10 +2,24 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import { fetchAllRows } from '@/lib/supabase/paginate';
 import { schoolSlug } from '@/utils/slugify';
+import {
+  getErrorMessage,
+  getSupabaseConnectionHint,
+  isSupabaseNetworkError,
+  isTableNotFoundError,
+} from '@/lib/supabase/error-utils';
 
-const isTableNotFoundError = (error: any) =>
-  error?.message?.includes('Could not find the table') ||
-  error?.message?.includes('does not exist');
+const unavailableResponse = (slug: string) =>
+  NextResponse.json(
+    {
+      slug,
+      total: 0,
+      rows: [],
+      warning: getSupabaseConnectionHint(),
+      connectionStatus: 'unavailable',
+    },
+    { status: 200 }
+  );
 
 export async function GET(
   _req: Request,
@@ -60,7 +74,8 @@ export async function GET(
         }
       }
     } catch (e: any) {
-      if (!isTableNotFoundError(e)) throw new Error(`courses query failed: ${e.message}`);
+      if (isSupabaseNetworkError(e)) return unavailableResponse(slug);
+      if (!isTableNotFoundError(e)) throw new Error(`courses query failed: ${getErrorMessage(e)}`);
     }
 
     if (courses.length > 0) {
@@ -81,7 +96,8 @@ export async function GET(
               };
             }
           }
-        } catch {
+        } catch (e: any) {
+          if (isSupabaseNetworkError(e)) return unavailableResponse(slug);
           // Mapping table may not exist yet — ignore
         }
       }
@@ -130,8 +146,9 @@ export async function GET(
           }))
           .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
       } catch (e: any) {
+        if (isSupabaseNetworkError(e)) return unavailableResponse(slug);
         if (!isTableNotFoundError(e)) {
-          throw new Error(`florida_final_dump query failed: ${e.message}`);
+          throw new Error(`florida_final_dump query failed: ${getErrorMessage(e)}`);
         }
       }
     }
@@ -139,6 +156,10 @@ export async function GET(
     return NextResponse.json({ slug, total: rows.length, rows });
   } catch (error: any) {
     console.error('[/api/mine/schools/[slug]] Error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to fetch school courses' }, { status: 500 });
+    if (isSupabaseNetworkError(error)) {
+      const { slug } = await params;
+      return unavailableResponse(slug);
+    }
+    return NextResponse.json({ error: getErrorMessage(error) || 'Failed to fetch school courses' }, { status: 500 });
   }
 }

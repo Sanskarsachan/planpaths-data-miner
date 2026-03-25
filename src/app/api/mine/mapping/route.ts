@@ -1,6 +1,12 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import { fetchAllRows } from '@/lib/supabase/paginate';
+import {
+  getErrorMessage,
+  getSupabaseConnectionHint,
+  isSupabaseNetworkError,
+  isTableNotFoundError,
+} from '@/lib/supabase/error-utils';
 
 const PREVIEW_LIMIT = 200;
 const BREAKDOWN_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -11,9 +17,13 @@ let breakdownCache: {
   data: Record<string, number>;
 } | null = null;
 
-const isTableNotFoundError = (error: any) =>
-  error?.message?.includes('Could not find the table') ||
-  error?.message?.includes('does not exist');
+const unavailablePayload = (totalRows = 0, matchBreakdown: Record<string, number> = {}) => ({
+  rows: [],
+  totalRows,
+  matchBreakdown,
+  warning: getSupabaseConnectionHint(),
+  connectionStatus: 'unavailable',
+});
 
 export async function GET(req: Request) {
   try {
@@ -30,7 +40,10 @@ export async function GET(req: Request) {
         .select('*', { count: 'exact', head: true });
       totalRows = count ?? 0;
     } catch (e: any) {
-      if (!isTableNotFoundError(e)) throw new Error(`mapping count failed: ${e.message}`);
+      if (isSupabaseNetworkError(e)) {
+        return NextResponse.json(unavailablePayload(), { status: 200 });
+      }
+      if (!isTableNotFoundError(e)) throw new Error(`mapping count failed: ${getErrorMessage(e)}`);
     }
 
     // ── 2. Match-type breakdown (optional, cached) ─────────────────────────────
@@ -51,7 +64,10 @@ export async function GET(req: Request) {
             data: matchBreakdown,
           };
         } catch (e: any) {
-          if (!isTableNotFoundError(e)) console.warn('[mapping] breakdown fetch skipped:', e.message);
+          if (isSupabaseNetworkError(e)) {
+            return NextResponse.json(unavailablePayload(totalRows), { status: 200 });
+          }
+          if (!isTableNotFoundError(e)) console.warn('[mapping] breakdown fetch skipped:', getErrorMessage(e));
         }
       }
     }
@@ -67,7 +83,10 @@ export async function GET(req: Request) {
         if (error && !isTableNotFoundError(error)) throw error;
         previewMapping = data ?? [];
       } catch (e: any) {
-        if (!isTableNotFoundError(e)) throw new Error(`mapping preview failed: ${e.message}`);
+        if (isSupabaseNetworkError(e)) {
+          return NextResponse.json(unavailablePayload(totalRows, matchBreakdown), { status: 200 });
+        }
+        if (!isTableNotFoundError(e)) throw new Error(`mapping preview failed: ${getErrorMessage(e)}`);
       }
     }
 
@@ -83,13 +102,26 @@ export async function GET(req: Request) {
         if (error && !isTableNotFoundError(error)) throw error;
         extractedData = data ?? [];
       } catch (e: any) {
-        if (!isTableNotFoundError(e)) console.warn('[mapping] extraction lookup skipped:', e.message);
+        if (isSupabaseNetworkError(e)) {
+          return NextResponse.json(unavailablePayload(totalRows, matchBreakdown), { status: 200 });
+        }
+        if (!isTableNotFoundError(e)) console.warn('[mapping] extraction lookup skipped:', getErrorMessage(e));
       }
     }
 
-    const { data: schoolsData } = includeRows
-      ? await supabase.from('schools').select('slug, name')
-      : { data: [] as any[] };
+    let schoolsData: any[] = [];
+    if (includeRows) {
+      const { data, error } = await supabase.from('schools').select('slug, name');
+      if (error) {
+        if (isSupabaseNetworkError(error)) {
+          return NextResponse.json(unavailablePayload(totalRows, matchBreakdown), { status: 200 });
+        }
+        if (!isTableNotFoundError(error)) {
+          throw new Error(`schools lookup failed: ${getErrorMessage(error)}`);
+        }
+      }
+      schoolsData = data ?? [];
+    }
     const extractedMap = Object.fromEntries(
       extractedData.map((e: any) => [e.id, { school_slug: e.school_slug, course_name: e.course_name }])
     );
@@ -114,6 +146,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ rows, totalRows, matchBreakdown });
   } catch (error: any) {
     console.error('[/api/mine/mapping] Error:', error);
-    return NextResponse.json({ error: error.message ?? 'Failed to fetch mapping results' }, { status: 500 });
+    if (isSupabaseNetworkError(error)) {
+      return NextResponse.json(unavailablePayload(), { status: 200 });
+    }
+    return NextResponse.json({ error: getErrorMessage(error) ?? 'Failed to fetch mapping results' }, { status: 500 });
   }
 }

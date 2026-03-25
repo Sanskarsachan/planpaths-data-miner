@@ -2,11 +2,22 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import { schoolSlug } from '@/utils/slugify';
 import { fetchAllRows } from '@/lib/supabase/paginate';
+import {
+  getErrorMessage,
+  getSupabaseConnectionHint,
+  isSupabaseNetworkError,
+  isTableNotFoundError,
+} from '@/lib/supabase/error-utils';
 
-// Helper: check if error is table-not-found (table doesn't exist yet)
-const isTableNotFoundError = (error: any) =>
-  error?.message?.includes('Could not find the table') ||
-  error?.message?.includes('does not exist');
+const unavailableResponse = () =>
+  NextResponse.json(
+    {
+      schools: [],
+      warning: getSupabaseConnectionHint(),
+      connectionStatus: 'unavailable',
+    },
+    { status: 200 }
+  );
 
 const isMatchedLogic = (logic: string | null | undefined) =>
   logic !== 'unmatched' && logic !== 'cpalms-terminated';
@@ -21,8 +32,14 @@ export async function GET() {
       .select('*')
       .order('name');
 
-    if (schoolsError && !isTableNotFoundError(schoolsError)) {
-      throw new Error(`schools query failed: ${schoolsError.message}`);
+    if (schoolsError) {
+      if (isTableNotFoundError(schoolsError)) {
+        // Allow fallback below.
+      } else if (isSupabaseNetworkError(schoolsError)) {
+        return unavailableResponse();
+      } else {
+        throw new Error(`schools query failed: ${getErrorMessage(schoolsError)}`);
+      }
     }
 
     // Fallback path: derive schools directly from florida_final_dump if schools table is empty.
@@ -35,7 +52,8 @@ export async function GET() {
           '"School Name", "County", mapping_logic'
         );
       } catch (e: any) {
-        if (!isTableNotFoundError(e)) throw new Error(`florida_final_dump query failed: ${e.message}`);
+        if (isSupabaseNetworkError(e)) return unavailableResponse();
+        if (!isTableNotFoundError(e)) throw new Error(`florida_final_dump query failed: ${getErrorMessage(e)}`);
       }
 
       const schoolMap: Record<
@@ -89,14 +107,16 @@ export async function GET() {
     try {
       extractionsTable = await fetchAllRows(supabase, 'extractions_v2', 'id, school_slug');
     } catch (e: any) {
-      if (!isTableNotFoundError(e)) throw new Error(`extractions_v2 query failed: ${e.message}`);
+      if (isSupabaseNetworkError(e)) return unavailableResponse();
+      if (!isTableNotFoundError(e)) throw new Error(`extractions_v2 query failed: ${getErrorMessage(e)}`);
     }
 
     let mappingTable: any[] = [];
     try {
       mappingTable = await fetchAllRows(supabase, 'mapping_results', 'extracted_id, match_type');
     } catch (e: any) {
-      if (!isTableNotFoundError(e)) throw new Error(`mapping_results query failed: ${e.message}`);
+      if (isSupabaseNetworkError(e)) return unavailableResponse();
+      if (!isTableNotFoundError(e)) throw new Error(`mapping_results query failed: ${getErrorMessage(e)}`);
     }
 
     const mappedExtractedIds = new Set(
@@ -136,6 +156,9 @@ export async function GET() {
     return NextResponse.json({ schools });
   } catch (error: any) {
     console.error('[/api/mine/schools] Error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to fetch schools' }, { status: 500 });
+    if (isSupabaseNetworkError(error)) {
+      return unavailableResponse();
+    }
+    return NextResponse.json({ error: getErrorMessage(error) || 'Failed to fetch schools' }, { status: 500 });
   }
 }

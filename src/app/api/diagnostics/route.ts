@@ -3,10 +3,19 @@ import { NextResponse } from 'next/server'
 
 export async function GET() {
   const supabase = createClient()
+  const hasPublishableKey = !!process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY
+  const hasAnonKey = !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
   const diagnostics: any = {
     timestamp: new Date().toISOString(),
     supabase_url: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'OK: Set' : 'Missing',
-    supabase_anon_key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'OK: Set' : 'Missing',
+    supabase_public_key: hasPublishableKey
+      ? 'OK: Set (publishable)'
+      : hasAnonKey
+        ? 'OK: Set (anon)'
+        : 'Missing',
+    supabase_publishable_key: hasPublishableKey ? 'OK: Set' : 'Missing',
+    supabase_anon_key: hasAnonKey ? 'OK: Set' : 'Missing',
     supabase_service_role_key: process.env.SUPABASE_SERVICE_ROLE_KEY 
       ? (process.env.SUPABASE_SERVICE_ROLE_KEY.length > 100 ? 'OK: Set (full)' : 'Warning: Set (incomplete - ends with ...)') 
       : 'Missing',

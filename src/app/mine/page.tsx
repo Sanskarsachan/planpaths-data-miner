@@ -196,6 +196,7 @@ function MineSection() {
   const [breakdownLoading, setBreakdownLoading] = useState(false);
   const [breakdownLoaded, setBreakdownLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   // Fetch schools summary first so the page can render quickly.
   useEffect(() => {
@@ -207,6 +208,7 @@ function MineSection() {
         if (schoolsRes.error) throw new Error(schoolsRes.error);
 
         setSchools(schoolsRes.schools || []);
+        setWarning(schoolsRes.warning || null);
       } catch (err: any) {
         setError(err.message || 'Failed to fetch data');
         console.error('[Mine] Fetch error:', err);
@@ -237,6 +239,9 @@ function MineSection() {
 
         setTotalMappingCount(prev => prev > 0 ? prev : (mappingRes.totalRows ?? 0));
         setServerMatchBreakdown(mappingRes.matchBreakdown ?? {});
+        if (mappingRes.warning) {
+          setWarning(prev => prev ?? mappingRes.warning);
+        }
         setBreakdownLoaded(true);
       } catch (err) {
         if (!cancelled) {
@@ -275,6 +280,9 @@ function MineSection() {
 
         setMappingRows(mappingRes.rows || []);
         setTotalMappingCount(mappingRes.totalRows ?? (mappingRes.rows?.length ?? 0));
+        if (mappingRes.warning) {
+          setWarning(prev => prev ?? mappingRes.warning);
+        }
         setMappingLoaded(true);
       } catch (err) {
         if (!cancelled) {
@@ -486,6 +494,25 @@ function MineSection() {
           flexDirection: 'column',
         }}
       >
+        {warning && mineSection !== 'florida' && (
+          <div
+            style={{
+              marginBottom: 16,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              borderRadius: 12,
+              border: '1px solid rgba(251,191,36,0.2)',
+              background: 'rgba(251,191,36,0.08)',
+              padding: '12px 14px',
+              color: '#fcd34d',
+            }}
+          >
+            <AlertTriangle size={15} strokeWidth={2.2} />
+            <div style={{ fontSize: 12, lineHeight: 1.6 }}>{warning}</div>
+          </div>
+        )}
+
         {/* ══ OVERVIEW ══ */}
         {mineSection === 'overview' && (
           <OverviewSection

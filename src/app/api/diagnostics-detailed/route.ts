@@ -1,5 +1,15 @@
 import { NextResponse } from 'next/server'
 
+const getSupabaseHost = (url?: string) => {
+  if (!url) return null
+
+  try {
+    return new URL(url).hostname
+  } catch {
+    return null
+  }
+}
+
 export async function GET() {
   const results: any = {
     timestamp: new Date().toISOString(),
@@ -8,13 +18,18 @@ export async function GET() {
 
   // Test 1: Check environment variables
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabasePublicKey = supabasePublishableKey || supabaseAnonKey
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const supabaseHost = getSupabaseHost(supabaseUrl)
 
   results.environment = {
     supabase_url_set: !!supabaseUrl,
     supabase_url_value: supabaseUrl,
+    supabase_publishable_key_set: !!supabasePublishableKey,
     supabase_anon_key_set: !!supabaseAnonKey,
+    supabase_public_key_set: !!supabasePublicKey,
     supabase_service_key_set: !!supabaseServiceKey,
     service_key_length: supabaseServiceKey?.length || 0,
     service_key_complete: supabaseServiceKey && supabaseServiceKey.length > 100 ? 'Complete' : 'Incomplete'
@@ -29,8 +44,8 @@ export async function GET() {
     if (supabaseServiceKey) {
       headers['Authorization'] = `Bearer ${supabaseServiceKey}`
     }
-    if (supabaseAnonKey) {
-      headers['apikey'] = supabaseAnonKey
+    if (supabasePublicKey) {
+      headers['apikey'] = supabasePublicKey
     }
     
     const response = await Promise.race([
@@ -57,19 +72,33 @@ export async function GET() {
   }
 
   // Test 3: DNS resolution
-  try {
-    console.log('Testing DNS resolution...')
-    const { Resolver } = require('dns').promises
-    const resolver = new Resolver()
-    const addresses = await resolver.resolve4('emowefxzeqkksjnddzip.supabase.co')
+  if (!supabaseHost) {
     results.network_tests.dns = {
-      status: 'Resolved',
-      addresses: addresses
+      status: 'Skipped',
+      error: 'Supabase URL is missing or invalid'
     }
-  } catch (err: any) {
+  } else if (supabaseHost === '127.0.0.1' || supabaseHost === 'localhost') {
     results.network_tests.dns = {
-      status: 'Failed',
-      error: err.message
+      status: 'Skipped',
+      error: `Local Supabase host ${supabaseHost} does not require external DNS resolution`
+    }
+  } else {
+    try {
+      console.log('Testing DNS resolution...')
+      const { Resolver } = require('dns').promises
+      const resolver = new Resolver()
+      const addresses = await resolver.resolve4(supabaseHost)
+      results.network_tests.dns = {
+        status: 'Resolved',
+        host: supabaseHost,
+        addresses: addresses
+      }
+    } catch (err: any) {
+      results.network_tests.dns = {
+        status: 'Failed',
+        host: supabaseHost,
+        error: err.message
+      }
     }
   }
 

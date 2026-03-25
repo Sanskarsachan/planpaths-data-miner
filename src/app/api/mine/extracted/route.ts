@@ -1,11 +1,22 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import { fetchAllRows } from '@/lib/supabase/paginate';
+import {
+  getErrorMessage,
+  getSupabaseConnectionHint,
+  isSupabaseNetworkError,
+  isTableNotFoundError,
+} from '@/lib/supabase/error-utils';
 
-// Helper: check if error is table-not-found (table doesn't exist yet)
-const isTableNotFoundError = (error: any) =>
-  error?.message?.includes('Could not find the table') ||
-  error?.message?.includes('does not exist');
+const unavailableResponse = () =>
+  NextResponse.json(
+    {
+      rows: [],
+      warning: getSupabaseConnectionHint(),
+      connectionStatus: 'unavailable',
+    },
+    { status: 200 }
+  );
 
 export async function GET() {
   try {
@@ -16,7 +27,8 @@ export async function GET() {
     try {
       extractedData = await fetchAllRows(supabase, 'extractions_v2', 'id, upload_id, school_slug, course_name, course_code, category, grade_level, credits, description');
     } catch (e: any) {
-      if (!isTableNotFoundError(e)) throw new Error(`extractions_v2 query failed: ${e.message}`);
+      if (isSupabaseNetworkError(e)) return unavailableResponse();
+      if (!isTableNotFoundError(e)) throw new Error(`extractions_v2 query failed: ${getErrorMessage(e)}`);
     }
 
     // Paginate mapped course IDs to filter unmatched
@@ -24,7 +36,8 @@ export async function GET() {
     try {
       mappingTable = await fetchAllRows(supabase, 'mapping_results', 'extracted_id');
     } catch (e: any) {
-      if (!isTableNotFoundError(e)) throw new Error(`mapping_results query failed: ${e.message}`);
+      if (isSupabaseNetworkError(e)) return unavailableResponse();
+      if (!isTableNotFoundError(e)) throw new Error(`mapping_results query failed: ${getErrorMessage(e)}`);
     }
 
     // Get schools info for display names (small table)
@@ -33,7 +46,8 @@ export async function GET() {
       .select('slug, name');
 
     if (schoolsError && !isTableNotFoundError(schoolsError)) {
-      throw new Error(`schools query failed: ${schoolsError.message}`);
+      if (isSupabaseNetworkError(schoolsError)) return unavailableResponse();
+      throw new Error(`schools query failed: ${getErrorMessage(schoolsError)}`);
     }
 
     // Build lookup maps
@@ -60,6 +74,9 @@ export async function GET() {
     return NextResponse.json({ rows });
   } catch (error: any) {
     console.error('[/api/mine/extracted] Error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to fetch extracted courses' }, { status: 500 });
+    if (isSupabaseNetworkError(error)) {
+      return unavailableResponse();
+    }
+    return NextResponse.json({ error: getErrorMessage(error) || 'Failed to fetch extracted courses' }, { status: 500 });
   }
 }
