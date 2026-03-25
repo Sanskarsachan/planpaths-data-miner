@@ -3,26 +3,80 @@
 @tailwind utilities;
 
 :root {
-  --accent: 220 90% 56%;
-  --foreground: 0 0% 3.6%;
-  --background: 0 0% 100%;
+  --accent: 263 56% 51%;
+  --accent-soft: 263 78% 70%;
+  --foreground: 252 35% 94%;
+  --muted-foreground: 252 13% 70%;
+  --background: 248 38% 8%;
+  --background-elevated: 249 35% 12%;
+  --panel-border: 253 22% 22%;
+  --panel-glow: 263 82% 60%;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --foreground: 0 0% 98%;
-    --background: 0 0% 3.6%;
+    --foreground: 252 35% 94%;
+    --background: 248 38% 8%;
   }
 }
 
 body {
   color: hsl(var(--foreground));
   background: hsl(var(--background));
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
-    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Source Sans Pro",
-    sans-serif;
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::selection {
+  background: hsla(var(--accent), 0.28);
+  color: hsl(var(--foreground));
+}
+
+a {
+  color: inherit;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0);
+  }
+}
+
+@keyframes pulse-grid {
+  0%, 100% {
+    opacity: 0.28;
+  }
+  50% {
+    opacity: 0.52;
+  }
+}
+
+@keyframes scan {
+  0% {
+    transform: translateY(-110%);
+  }
+  100% {
+    transform: translateY(110%);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
 }
 
 @layer components {
@@ -31,18 +85,91 @@ body {
   }
 
   .btn-primary {
-    @apply btn bg-blue-600 text-white hover:bg-blue-700;
+    @apply btn text-white;
+    background: linear-gradient(135deg, #6d4aff 0%, #382568 100%);
+    box-shadow: 0 18px 40px rgba(92, 60, 201, 0.28);
   }
 
   .btn-secondary {
-    @apply btn bg-gray-200 text-gray-900 hover:bg-gray-300;
+    @apply btn;
+    background: rgba(255, 255, 255, 0.05);
+    color: hsl(var(--foreground));
+    border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   .card {
-    @apply rounded-lg border border-gray-200 bg-white p-6 shadow-sm;
+    @apply rounded-2xl p-6;
+    border: 1px solid hsla(var(--panel-border), 0.85);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02)),
+      hsl(var(--background-elevated));
+    box-shadow: 0 24px 80px rgba(3, 2, 9, 0.36);
   }
 
   .input {
-    @apply w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500;
+    @apply w-full rounded-md px-3 py-2 text-sm focus:outline-none;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: hsl(var(--foreground));
+    box-shadow: 0 0 0 0 rgba(109, 74, 255, 0);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+
+  .input:focus {
+    border-color: rgba(109, 74, 255, 0.55);
+    box-shadow: 0 0 0 4px rgba(109, 74, 255, 0.14);
+  }
+
+  .surface-grid {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .surface-grid::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+    background-size: 32px 32px;
+    mask-image: radial-gradient(circle at center, black 35%, transparent 90%);
+    animation: pulse-grid 6s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  .panel-glow {
+    position: relative;
+  }
+
+  .panel-glow::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(167, 139, 250, 0.42), rgba(34, 211, 238, 0.12), rgba(255, 255, 255, 0.04));
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  .animate-float {
+    animation: float 5.5s ease-in-out infinite;
+  }
+
+  .animate-fade-up {
+    animation: fade-up 0.7s ease-out both;
+  }
+
+  .animate-fade-up-delay {
+    animation: fade-up 0.7s ease-out 0.12s both;
+  }
+
+  .animate-scan {
+    animation: scan 4.8s linear infinite;
   }
 }
