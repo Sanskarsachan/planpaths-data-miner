@@ -261,6 +261,14 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
 ```
 
+If using local Supabase (`supabase start`), use:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<from `supabase status`>
+SUPABASE_SERVICE_ROLE_KEY=<from `supabase status`>
+```
+
 ### PDF Upload Size
 
 If uploads fail, increase formidable max size in `/api/extract/route.ts`:

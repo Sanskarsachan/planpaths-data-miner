@@ -14,9 +14,23 @@ SUPABASE_SERVICE_ROLE_KEY=your-key
 GEMINI_API_KEY=your-key
 ```
 
+If you are running Supabase locally, use:
+```env
+NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<from supabase status>
+SUPABASE_SERVICE_ROLE_KEY=<from supabase status>
+GEMINI_API_KEY=your-key
+```
+
 **Where to get keys:**
 - Supabase: https://supabase.com → Create project → Settings → API
 - Gemini: https://makersuite.google.com/app/apikey
+
+For local Supabase keys:
+```bash
+supabase start
+supabase status
+```
 
 ## 2⃣ Database Setup (2 minutes)
 
